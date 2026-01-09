@@ -1,137 +1,373 @@
-# 🤖 AutoBid AI - Intelligent Tender Management System
+# 🚀 AutoBid AI
 
-**AutoBid AI** is a SaaS platform designed to revolutionize tender management and commercial proposal creation. Leveraging **Generative AI (RAG)** and **Machine Learning**, the system analyzes complex tender documents (PDFs), estimates win probability based on historical data, and drafts proposals aligned with company expertise.
+**AutoBid AI** is an intelligent bid assistance platform that leverages Artificial Intelligence and Machine Learning to help companies analyze, evaluate, and generate bid proposals more efficiently and effectively.
 
-## ✨ Key Features
+## 📋 Table of Contents
 
-* **📄 Intelligent Document Analysis:** Ingestion and parsing of complex PDFs (Tenders, RFPs) using OCR and Natural Language Processing.
-* **🧠 RAG Engine (Retrieval-Augmented Generation):** Semantic search using **Pinecone** and **Google Gemini** to cross-reference client requirements with the company's Knowledge Base (Case studies, CVs, etc.).
-* **🔮 Win Probability Prediction:** A Machine Learning model (**Scikit-Learn**) that learns from historical bid data to predict the likelihood of success (`WON`/`LOST`).
-* **✍️ Proposal Generator:** Automatic drafting of structured proposals with adaptive tone and strict adherence to technical requirements.
-* **🛡️ Privacy & Security:** Automatic anonymization of sensitive data (PII) in uploaded documents using **Microsoft Presidio**.
-* **📊 Analytics Dashboard:** Real-time metrics on Pipeline value, Win Rate, and Industry distribution.
-* **🔐 Multi-Tenancy:** Secure architecture with user data isolation via **Clerk** authentication.
+- [Features](#-features)
+- [Technologies](#-technologies)
+- [Architecture](#-architecture)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [API](#-api)
+- [Deployment](#-deployment)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-## 🛠️ Tech Stack
+## ✨ Features
 
-### Frontend
-* **Framework:** [Next.js 14](https://nextjs.org/) (App Router)
-* **Language:** TypeScript
-* **UI/UX:** Tailwind CSS, Shadcn/UI, Lucide Icons
-* **Visualization:** Recharts
-* **Auth:** Clerk
+### 🤖 Artificial Intelligence
+- **Automatic Bid Analysis**: Upload a bid/tender PDF, and the system automatically extracts key information (industry, budget, deadline, technical score).
+- **Proposal Generation**: Generate proposal drafts using RAG (Retrieval-Augmented Generation) based on your knowledge base.
+- **Smart Chat**: Ask questions about active bids or your knowledge base and get context-aware responses.
+
+### 📊 Machine Learning
+- **Win Probability Prediction**: A Machine Learning model (Random Forest) that predicts the probability of winning a bid based on:
+  - Industry
+  - Budget
+  - Technical Score
+  - Urgency (days until deadline)
+- **Automatic Re-training**: The model automatically retrains when you add new historical bids (won or lost).
+- **Explainability**: Uses SHAP to explain the model's predictions.
+
+### 📚 Knowledge Base (RAG)
+- **Document Management**: Upload PDF documents (Resumes/CVs, case studies, technical documentation) and organize them by category.
+- **Semantic Search**: Uses Pinecone as a vector database for precise semantic searches.
+- **Automatic Categorization**: Automatically detects the category of uploaded documents.
+- **Multi-tenant**: Each user has their own isolated namespace in Pinecone.
+
+### 📈 Dashboard & Analytics
+- **Real-time Statistics**: Visualize KPIs such as success rate, total amount won, and pipeline.
+- **Industry Distribution**: Charts showing the distribution of bids by industry.
+- **Complete History**: Manage all your bids (active, won, lost) in one place.
+- **Bulk Update**: Update the status of multiple bids simultaneously.
+
+### 🔒 Security & Privacy
+- **Clerk Authentication**: Robust and secure authentication system.
+- **Multi-tenant**: Complete data isolation per user.
+- **Data Anonymization**: Uses Presidio to detect and anonymize sensitive information.
+- **Token Logging**: Monitors token usage for AI APIs.
+
+## 🛠 Technologies
 
 ### Backend
-* **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11)
-* **Database:** PostgreSQL (via **Neon Tech**) + SQLAlchemy (ORM)
-* **Vector DB:** Pinecone (Serverless)
-* **AI/LLM:** LangChain, Google Gemini (Flash 2.5)
-* **ML & Data:** Pandas, Scikit-learn, Numpy
-* **Privacy:** Microsoft Presidio + Spacy (`en_core_web_sm`)
+- **FastAPI**: Modern, fast web framework for Python.
+- **PostgreSQL**: Relational database.
+- **SQLAlchemy**: ORM for Python.
+- **Pinecone**: Vector database for RAG.
+- **Google Gemini**: Language model for generation and analysis.
+- **LangChain**: Framework for LLM applications.
+- **scikit-learn**: Machine Learning (Random Forest).
+- **SHAP**: ML model explainability.
+- **Presidio**: Sensitive data anonymization.
 
-### Infrastructure & Deploy
-* **Frontend:** Vercel
-* **Backend:** Render (Web Service)
-* **Database:** Neon (Serverless Postgres)
+### Frontend
+- **Next.js 14**: React framework with App Router.
+- **TypeScript**: Static typing.
+- **Tailwind CSS**: Utility-first CSS.
+- **shadcn/ui**: Modern and accessible UI components.
+- **Clerk**: Authentication and user management.
+- **Recharts**: Data visualization.
+- **React Hook Form**: Form handling.
 
-## 🏗️ Architecture
+### DevOps
+- **Docker**: Containerization.
+- **Docker Compose**: Service orchestration.
+- **Uvicorn**: ASGI server for FastAPI.
+
+## 🏗 Architecture
 
 
+```
 
-The system follows a decoupled microservices architecture:
-1.  **Ingestion:** The user uploads a PDF via the Frontend.
-2.  **Processing:** FastAPI receives the file, extracts text, and detects PII entities.
-3.  **Vectorization:** Clean text is converted into embeddings (Google GenAI) and stored in Pinecone with user-specific metadata (Namespaces).
-4.  **Inference:**
-    * **RAG:** Retrieves relevant context to answer chat queries or generate proposals.
-    * **ML:** The classification model evaluates extracted parameters (Budget, Industry, Deadline) to output a win score.
+┌─────────────────┐
+│   Frontend      │
+│   (Next.js)     │
+│   Port: 3000    │
+└────────┬────────┘
+│
+│ HTTP/REST
+│
+┌────────▼────────┐
+│   Backend      │
+│   (FastAPI)    │
+│   Port: 8000   │
+└────┬───────┬───┘
+│       │
+│       │
+┌────▼───┐ ┌─▼──────────┐
+│PostgreSQL│ │  Pinecone  │
+│          │ │ (Vector DB)│
+└──────────┘ └────────────┘
+│
+│
+┌────▼──────────┐
+│ Google Gemini │
+│     API      │
+└──────────────┘
 
-## 🚀 Local Installation & Setup
+```
 
-Follow these steps to run the project locally.
+## 📦 Prerequisites
 
-### Prerequisites
-* Node.js 18+
-* Python 3.10+
-* Docker (Optional, for local DB)
+- **Docker** and **Docker Compose** installed.
+- **Node.js** 18+ and **pnpm** (for local frontend development).
+- **Python** 3.10+ (for local backend development).
+- Accounts and API keys for:
+  - [Clerk](https://clerk.com) (Authentication)
+  - [Google Gemini](https://makersuite.google.com/app/apikey) (AI)
+  - [Pinecone](https://www.pinecone.io) (Vector Database)
 
-### 1. Clone the repository
+## 🚀 Installation
+
+### 1. Clone the Repository
+
 ```bash
-git clone [https://github.com/YOUR_USERNAME/autobid-ai.git](https://github.com/YOUR_USERNAME/autobid-ai.git)
+git clone [https://github.com/matiasrodriguezc/autobid-ai.git](https://github.com/matiasrodriguezc/autobid-ai.git)
 cd autobid-ai
 
 ```
 
-### 2. Configure Backend
+### 2. Configure Environment Variables
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-
-```
-
-Create a `.env` file in `/backend` with your keys:
+Create a `.env` file in the root of the project:
 
 ```env
-DATABASE_URL="postgresql://user:pass@host/db"
-GOOGLE_API_KEY="AIza..."
-PINECONE_API_KEY="pcsk..."
-PINECONE_ENV="us-east-1"
-CLERK_SECRET_KEY="sk_test..."
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test..."
+# PostgreSQL Database
+POSTGRES_USER=autobid_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=autobid_db
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+
+# Google Gemini API
+GOOGLE_API_KEY=your_google_api_key
+
+# Pinecone
+PINECONE_API_KEY=your_pinecone_api_key
+PINECONE_ENVIRONMENT=your_environment  # e.g., us-east-1
+PINECONE_INDEX_NAME=autobid-index
+
+# Clerk (Frontend)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+
+# Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ```
 
-Start the server:
+### 3. Start with Docker Compose
 
 ```bash
-uvicorn app.main:app --reload
+docker-compose up -d
 
 ```
 
-### 3. Configure Frontend
+This will start:
+
+* PostgreSQL on port 5432
+* FastAPI Backend on port 8000
+
+### 4. Start Frontend (Development)
 
 ```bash
-cd ../frontend
-npm install  # or pnpm install
+cd frontend
+pnpm install
+pnpm dev
 
 ```
 
-Create a `.env.local` file in `/frontend`:
+The frontend will be available at `http://localhost:3000`.
 
-```env
-NEXT_PUBLIC_API_URL="http://localhost:8000"
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test..."
-CLERK_SECRET_KEY="sk_test..."
+## ⚙️ Configuration
+
+### Create Pinecone Index
+
+Before using the application, you need to create an index in Pinecone:
+
+1. Go to [Pinecone Console](https://app.pinecone.io).
+2. Create a new index with:
+* **Name**: `autobid-index` (or whatever you specified in `.env`).
+* **Dimensions**: `768` (for Gemini embeddings).
+* **Metric**: `cosine`.
+
+
+
+### Configure Clerk
+
+1. Create an account at [Clerk](https://clerk.com).
+2. Create a new application.
+3. Copy the API keys and set them in `.env`.
+4. Configure the callback URLs in Clerk:
+* Sign-in URL: `http://localhost:3000/sign-in`
+* Sign-up URL: `http://localhost:3000/sign-up`
+* After sign-in URL: `http://localhost:3000/dashboard`
+
+
+
+## 📖 Usage
+
+### 1. Log In
+
+Access `http://localhost:3000` and create an account or log in with Clerk.
+
+### 2. Configure Your Company
+
+Go to **Settings** and fill in:
+
+* Company Name
+* Description
+* Website
+* AI Tone (formal, persuasive, technical)
+* Creativity Level
+* Language
+
+### 3. Upload Knowledge Base
+
+Go to **Knowledge Base** and upload PDF documents:
+
+* Team CVs/Resumes
+* Case Studies
+* Technical Documentation
+* Past Proposals
+
+These documents will be used to generate more accurate proposals.
+
+### 4. Analyze a Bid
+
+1. Go to **Bid Agent**.
+2. Upload the Bid/Tender PDF.
+3. The system automatically:
+* Extracts key information (industry, budget, deadline).
+* Calculates win probability using ML.
+* Provides explanations for the prediction.
+
+
+
+### 5. Generate a Proposal
+
+1. With an active bid loaded, use the chat to ask questions.
+2. Or generate a full proposal draft.
+3. Edit and personalize it in the **Proposal Editor**.
+
+### 6. Manage History
+
+* **Upload History**: Upload PDFs of past bids (won or lost) to train the model.
+* **View Stats**: Check your success rate, total amount won, and pipeline in the dashboard.
+* **Update Status**: Mark bids as won/lost to improve future predictions.
+
+## 📁 Project Structure
+
+```
+autobid-ai/
+├── backend/
+│   ├── app/
+│   │   ├── core/           # Configuration and security
+│   │   ├── db/              # Models and DB session
+│   │   ├── services/        # ML and RAG services
+│   │   ├── utils/           # Utilities (PDF parser, privacy)
+│   │   ├── models_storage/  # Trained ML models
+│   │   └── main.py          # FastAPI app
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── app/                 # Next.js App Router
+│   │   ├── dashboard/       # Dashboard pages
+│   │   └── ...
+│   ├── components/          # React components
+│   ├── lib/                 # Utilities
+│   └── package.json
+├── docker-compose.yml
+└── README.md
 
 ```
 
-Start the client:
+## 🔌 API
 
-```bash
-npm run dev
+### Main Endpoints
 
-```
+#### RAG and Knowledge Base
 
-Visit `http://localhost:3000` and you're set! 🎉
+* `POST /rag/upload-pdf` - Upload PDF document
+* `GET /rag/documents` - List documents
+* `POST /rag/chat` - Chat with knowledge base
+* `POST /rag/generate-proposal` - Generate proposal
 
-## 🧪 Main API Endpoints
+#### Machine Learning
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/rag/upload-pdf` | Uploads and vectorizes documents to the Knowledge Base. |
-| `POST` | `/rag/generate-proposal` | Generates a proposal draft based on the active tender. |
-| `POST` | `/ml/force-retrain` | Force retrains the predictive model using historical data. |
-| `POST` | `/history/upload` | Uploads past bids to feed the training dataset. |
+* `POST /ml/force-retrain` - Force ML model retraining
 
-## 🤝 Contribution
+#### Bids
 
-Contributions are welcome. Please open an issue or submit a pull request to discuss major changes.
+* `GET /bids` - List bids
+* `POST /history/upload` - Upload historical bid
+* `POST /bids/finalize` - Finalize draft
+* `PUT /bids/bulk-update-status` - Bulk update status
+* `DELETE /bids/{bid_id}` - Delete bid
 
-## 📄 License
+#### Dashboard
 
-This project is licensed under the MIT License - see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
-```
+* `GET /dashboard/stats` - Dashboard statistics
+* `GET /system/stats` - System statistics
+
+#### Settings
+
+* `GET /settings` - Get settings
+* `POST /settings` - Update settings
+
+### Interactive Documentation
+
+Once the backend is running, access:
+
+* **Swagger UI**: `http://localhost:8000/docs`
+* **ReDoc**: `http://localhost:8000/redoc`
+
+## 🚢 Deployment
+
+### Backend (Vercel, Railway, Render, etc.)
+
+1. Configure environment variables on your platform.
+2. Ensure PostgreSQL and Pinecone are accessible.
+3. The backend deploys as a standard FastAPI application.
+
+### Frontend (Vercel recommended)
+
+1. Connect your repository to Vercel.
+2. Configure environment variables.
+3. Vercel will automatically detect Next.js and deploy.
+
+### Database
+
+* **PostgreSQL**: Use a managed service (AWS RDS, Supabase, Neon, etc.).
+* **Pinecone**: It is a cloud service, you only need the credentials.
+
+## 🤝 Contributing
+
+Contributions are welcome. Please:
+
+1. Fork the project.
+2. Create a branch for your feature (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a Pull Request.
+
+## 📝 License
+
+This project is licensed under the MIT License. See the `LICENSE` file for more details.
+
+## 🙏 Acknowledgments
+
+* [FastAPI](https://fastapi.tiangolo.com)
+* [Next.js](https://nextjs.org)
+* [Clerk](https://clerk.com)
+* [Google Gemini](https://deepmind.google/technologies/gemini/)
+* [Pinecone](https://www.pinecone.io)
+* [shadcn/ui](https://ui.shadcn.com)

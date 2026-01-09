@@ -1,0 +1,31 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Entornos Virtuales ---
+venv/
+.venv/
+env/
+
+# --- Cache de Tests ---
+.pytest_cache/
+
+# --- Variables de Entorno del Backend ---
+.env
+.env.*
+!.env.example
+
+# --- ML & Modelos (Arquitectura Nueva) ---
+# Ignorar cualquier .pkl suelto en la raíz del backend
+*.pkl
+
+# Ignorar modelos de usuarios (dinámicos)
+app/models_storage/*.pkl
+app/models_storage/*.joblib
+
+# ¡IMPORTANTE! Mantener la carpeta vacía para que git sepa que existe
+!app/models_storage/.gitkeep
+
+# (Opcional) Si te quedó la carpeta vieja y la quieres ignorar
+ml_models/

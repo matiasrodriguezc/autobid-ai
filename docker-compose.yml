@@ -1,0 +1,42 @@
+services:
+  # 1. Servicio de Base de Datos
+  db:
+    image: postgres:15-alpine
+    container_name: autobid_db
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - autobid_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autobid_user -d autobid_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  # 2. Servicio Backend (API)
+  backend:
+    build: ./backend
+    container_name: autobid_api
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app       # Hot-Reload: cambios en código se ven al instante
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - autobid_network
+
+networks:
+  autobid_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

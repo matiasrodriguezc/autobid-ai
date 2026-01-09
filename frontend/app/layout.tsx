@@ -1,7 +1,7 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import { ThemeProvider } from "@/components/theme-provider" // <--- IMPORTAR
 import './globals.css'
-
+export const dynamic = 'force-dynamic'
 export default function RootLayout({
   children,
 }: {

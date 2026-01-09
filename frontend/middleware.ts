@@ -2,12 +2,17 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher(['/dashboard(.*)']);
 
-// 1. Agregamos 'async' antes de los argumentos
+// 1. AÑADIDO 'async' AQUÍ 👇
 export default clerkMiddleware(async (auth, req) => {
-  // 2. Agregamos 'await' antes de llamar a auth() y encerramos en paréntesis si es necesario
-  // O simplemente esperamos el objeto auth y luego ejecutamos protect
   if (isProtectedRoute(req)) {
-    await auth.protect(); 
+    
+    // 2. AÑADIDO 'await' AQUÍ 👇
+    // TypeScript se quejaba porque intentabas leer datos de una Promesa sin resolver.
+    const { userId, redirectToSignIn } = await auth();
+
+    if (!userId) {
+      return redirectToSignIn();
+    }
   }
 });
 

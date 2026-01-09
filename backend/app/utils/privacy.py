@@ -1,19 +1,28 @@
 import logging
 from presidio_analyzer import AnalyzerEngine
+from presidio_analyzer.nlp_engine import NlpEngineProvider # <--- IMPORTANTE
 from presidio_anonymizer import AnonymizerEngine
 
-# Configuramos logs para ver qué está censurando
+# Configuramos logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("privacy_module")
 
-# Inicializamos los motores de Presidio (Singleton pattern implícito al importar)
-# Esto carga el modelo de NLP en memoria una sola vez.
+# --- CONFIGURACIÓN PARA RENDER (BAJO CONSUMO) ---
+# Forzamos el uso del modelo 'sm' (Small - 12MB) para no saturar la RAM
 try:
-    analyzer = AnalyzerEngine()
+    nlp_configuration = {
+        "nlp_engine_name": "spacy",
+        "models": [{"lang_code": "en", "model_name": "en_core_web_sm"}],
+    }
+    provider = NlpEngineProvider(nlp_configuration=nlp_configuration)
+    
+    # Iniciamos el motor con la configuración ligera
+    analyzer = AnalyzerEngine(nlp_engine=provider.create_engine())
     anonymizer = AnonymizerEngine()
-    logger.info("🛡️ Motor de Privacidad (Microsoft Presidio) iniciado correctamente.")
+    
+    logger.info("🛡️ Motor de Privacidad (Small Model) iniciado correctamente.")
 except Exception as e:
-    logger.error(f"❌ Error iniciando Presidio. Asegúrate de haber instalado el modelo spacy: {e}")
+    logger.error(f"❌ Error iniciando Presidio: {e}")
     analyzer = None
     anonymizer = None
 
@@ -28,8 +37,7 @@ def sanitize_text(text: str) -> str:
 
     try:
         # Definimos explícitamente qué queremos buscar.
-        # EXCLUIMOS: "PERSON", "LOCATION", "DATE_TIME", "NRP", "US_DRIVER_LICENSE"
-        # para evitar que borre skills como "Docker", "Java" o fechas importantes.
+        # EXCLUIMOS: "PERSON", "LOCATION", "DATE_TIME" para evitar borrar skills.
         allowed_entities = [
             "EMAIL_ADDRESS", 
             "PHONE_NUMBER", 
@@ -44,9 +52,9 @@ def sanitize_text(text: str) -> str:
         # 1. Análisis
         results = analyzer.analyze(
             text=text, 
-            language='en', # Usamos el modelo cargado (en_core_web_lg)
-            entities=allowed_entities, # <--- EL FILTRO DE ORO
-            score_threshold=0.4 # Solo censura si está 40% seguro
+            language='en', 
+            entities=allowed_entities, # Mantenemos tu filtro de oro
+            score_threshold=0.4 
         )
 
         # 2. Anonimización

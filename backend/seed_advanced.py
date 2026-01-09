@@ -1,19 +1,25 @@
 # backend/seed_advanced.py
 import sys
 import os
-from dotenv import load_dotenv # <--- NUEVO IMPORT
+from dotenv import load_dotenv
 
 # --- 1. CARGA FORZADA DE VARIABLES DE ENTORNO ---
-# Esto busca el archivo .env y carga las variables para que Pydantic no falle
 load_dotenv()
 
-# --- 2. IMPORTACIONES NORMALES ---
+# --- 2. IMPORTACIONES ---
 from datetime import datetime, timedelta, timezone
-from app.db.session import SessionLocal
+# AGREGAMOS 'engine' y 'Base' aquí:
+from app.db.session import SessionLocal, engine, Base 
 from app.db.models import Bid
 
-# --- TU ID DE USUARIO ---
-USER_ID = "user_37iZ7xFkzLguZcveiz8cW3rrw7R" # <--- ¡RECUERDA PONER TU ID REAL DE CLERK AQUÍ!
+# --- 3. CREACIÓN DE TABLAS (LA SOLUCIÓN AL ERROR) ---
+print("🏗️  Conectando a Neon y construyendo tablas...")
+# Esto lee tus modelos (como Bid) y crea las tablas SQL automáticamente
+Base.metadata.create_all(bind=engine)
+print("✅  Tablas creadas exitosamente.")
+
+# --- 4. CONFIGURACIÓN DE USUARIO ---
+USER_ID = "user_37iZ7xFkzLguZcveiz8cW3rrw7R" 
 
 db = SessionLocal()
 
@@ -59,4 +65,4 @@ for i in range(3):
     ))
 
 db.commit()
-print("✅ Historial Inyectado. Ahora ve al dashboard y sube un archivo cualquiera para forzar el entrenamiento.")
+print("✅ Historial Inyectado. Tu base de datos en la nube está lista 🚀.")

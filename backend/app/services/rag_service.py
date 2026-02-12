@@ -37,7 +37,7 @@ class GoogleLegacyEmbeddings(Embeddings):
     """
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        self.model_name = "models/embedding-001"
+        self.model_name = "models/text-embedding-gecko-001"
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         # Google permite batching. Procesamos en lotes.

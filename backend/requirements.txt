@@ -28,3 +28,4 @@ python-jose[cryptography]
 requests
 
 sentence-transformers==2.5.1
+langchain-openai>=0.1.3

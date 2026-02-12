@@ -3,8 +3,12 @@ import json
 import re
 from typing import List, Dict, Any, Optional
 
-# --- VOLVEMOS A GOOGLE (Lo rápido) ---
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+# --- CONFIGURACIÓN HÍBRIDA ---
+# 1. Embeddings: OpenAI (Estabilidad pura)
+from langchain_openai import OpenAIEmbeddings
+# 2. Chat: Google Gemini (Rapidez y Ventana de contexto grande)
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from langchain_pinecone import PineconeVectorStore
 from langchain.prompts import PromptTemplate
 from langchain.schema import StrOutputParser
@@ -32,6 +36,7 @@ index_name = "autobid-index"
 # --- HELPER LOGGING ---
 def _log_token_usage(user_id: str, model_name: str, response: Any):
     try:
+        # Intentamos capturar tokens de Gemini
         token_info = response.response_metadata.get("token_usage", {})
         if not token_info and "usage_metadata" in response.response_metadata:
              token_info = response.response_metadata.get("usage_metadata", {})
@@ -57,18 +62,21 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 
 def get_embeddings():
     """
-    Carga el modelo de Google.
-    Ahora que tenemos las librerías actualizadas, el modelo 004 VOLARÁ.
+    Carga OpenAI Embeddings.
+    Modelo: text-embedding-3-small (Rápido, Barato, 1536 dimensiones).
     """
     global _embeddings
     if _embeddings is None:
-        print("⚡ Conectando a Google text-embedding-004...")
-        _embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004", # Nombre correcto
-            google_api_key=settings.GOOGLE_API_KEY,
-            # IMPORTANTE: Sin task_type para evitar el bug del 404 en v1beta
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            print("❌ ERROR CRÍTICO: Falta OPENAI_API_KEY en variables de entorno.")
+        
+        print("🔵 Conectando a OpenAI Embeddings (text-embedding-3-small)...")
+        _embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            openai_api_key=api_key
         )
-        print("✅ Google Embeddings Conectado.")
+        print("✅ OpenAI Embeddings Conectado.")
     return _embeddings
 
 def get_vector_store():
@@ -89,6 +97,9 @@ def get_pc_index():
     return _pc_index
 
 def get_llm():
+    """
+    Seguimos usando Gemini para el CHAT porque es muy bueno y barato.
+    """
     global _llm
     if _llm is None:
         _llm = ChatGoogleGenerativeAI(
@@ -123,7 +134,7 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         except Exception:
             pass
 
-    print(f"--- INGESTANDO ({len(text)} chars) -> Google -> Pinecone ---")
+    print(f"--- INGESTANDO ({len(text)} chars) -> OpenAI -> Pinecone ---")
     try:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = text_splitter.split_text(text)
@@ -132,10 +143,9 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         vstore = get_vector_store()
         ids = vstore.add_documents(docs, namespace=namespace)
         
-        return {"message": "Procesado con Google 004 🚀", "chunks_count": len(ids)}
+        return {"message": "Procesado con OpenAI 🚀", "chunks_count": len(ids)}
     except Exception as e:
         print(f"Error CRÍTICO ingest: {e}")
-        # Si falla Google, lanzamos el error para verlo en el log
         raise e
 
 def delete_document_by_source(filename: str, namespace: str):
@@ -172,7 +182,7 @@ def extract_key_data(text: str, user_id: str):
 def ask_gemini_with_context(question: str, namespace: str):
     try:
         vstore = get_vector_store()
-        # Búsqueda vectorial rápida
+        # Búsqueda vectorial con OpenAI
         docs = vstore.similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
         
         if not docs: return {"answer": "No hay datos.", "sources": []}
@@ -180,6 +190,7 @@ def ask_gemini_with_context(question: str, namespace: str):
         ctx = "\n".join([d.page_content for d in docs])
         prompt = f"Contexto: {ctx}\nPregunta: {question}\nRespuesta:"
         
+        # Generación con Gemini
         llm = get_llm()
         res = llm.invoke(prompt)
         _log_token_usage(namespace, llm.model, res)
@@ -216,7 +227,6 @@ def generate_proposal_draft(namespace: str):
     tender_res = vstore.similarity_search("objetivos requisitos", k=6, filter={"category": "active_tender"}, namespace=namespace)
     tender_txt = "\n".join([d.page_content for d in tender_res])
 
-    # Smart Search
     q_res = llm.invoke(f"Based on: '{tender_txt[:500]}...', write a search query for similar case studies.")
     comp_res = vstore.similarity_search(q_res.content, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)
     comp_txt = "\n".join([d.page_content for d in comp_res])

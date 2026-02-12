@@ -4,8 +4,8 @@ import time
 import requests
 from typing import List, Dict, Any, Optional
 
-# LangChain y Pinecone
-from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+# --- IMPORTANTE: Usamos la interfaz base limpia, sin Pydantic ---
+from langchain_core.embeddings import Embeddings 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
 from langchain.prompts import PromptTemplate
@@ -27,47 +27,47 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE MANUAL (DIRECT HTTP REQUEST) ---
-# Esta clase ignora la lógica interna de LangChain y llama directamente a la API
-class ManualHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
-    
+# --- CLASE MANUAL LIMPIA (Sin herencia de Pydantic) ---
+class ManualHFEmbeddings(Embeddings):
+    """
+    Clase totalmente manual para conectar con HuggingFace.
+    Hereda de 'Embeddings' solo para cumplir con la interfaz que pide Pinecone.
+    """
     def __init__(self, api_key, model_name):
+        # Al no heredar de un modelo Pydantic, podemos usar __init__ normal
         self.api_key = api_key
         self.model_name = model_name
-        # URL NUEVA FORZADA
         self.api_url = f"https://router.huggingface.co/hf-inference/models/{model_name}"
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        # "wait_for_model": True hace que HF espere en el servidor en vez de dar error 503
+        # wait_for_model evita el error 503
         payload = {"inputs": texts, "options": {"wait_for_model": True}}
 
         for attempt in range(5):
             try:
-                response = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
+                response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
                 
-                # Si falla por status code (ej 500, 404, etc)
                 if response.status_code != 200:
                     raise ValueError(f"Error {response.status_code}: {response.text}")
 
                 data = response.json()
 
-                # Validación de Errores en el JSON
                 if isinstance(data, dict) and "error" in data:
                     raise ValueError(f"HF Error JSON: {data}")
 
-                # Validación de Formato (Debe ser lista de listas)
+                # Verificamos que sea una lista de vectores (lista de listas)
                 if isinstance(data, list) and len(data) > 0:
                     if isinstance(data[0], list):
-                        return data # ¡Éxito!
+                        return data 
                     else:
-                        raise ValueError(f"Formato inesperado (no es lista de vectores): {data}")
+                        raise ValueError(f"Formato inesperado: {data}")
                 
                 raise ValueError(f"Respuesta vacía o incorrecta: {data}")
 
             except Exception as e:
                 print(f"⚠️ Intento {attempt+1}/5 fallido. Error: {e}")
-                if "401" in str(e):
+                if "401" in str(e) or "403" in str(e):
                     print("❌ TOKEN INVALIDO.")
                     raise e
                 
@@ -77,7 +77,7 @@ class ManualHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
         raise RuntimeError("Falló la conexión manual con HuggingFace tras 5 intentos.")
 
     def embed_query(self, text: str) -> List[float]:
-        # Reutilizamos la lógica de documentos para una sola query
+        # Reutilizamos la lógica
         result = self.embed_documents([text])
         return result[0]
 
@@ -91,7 +91,6 @@ def get_embeddings():
             print("❌ CRÍTICO: FALTA TOKEN HF")
         
         print("☁️ Conectando a HuggingFace (Modo Manual Directo)...")
-        # Usamos nuestra clase manual
         _embeddings = ManualHFEmbeddings(
             api_key=key,
             model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -215,16 +214,23 @@ def generate_proposal_draft(namespace: str):
     vstore = get_vector_store()
     llm = get_llm()
     try:
-        tender = " ".join([d.page_content for d in vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)])
-        q = llm.invoke(f"Search query based on: {tender[:500]}").content
-        company = " ".join([d.page_content for d in vstore.similarity_search(q, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)])
+        tender_res = vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)
+        tender_txt = " ".join([d.page_content for d in tender_res])
+
+        q_res = llm.invoke(f"Search query based on: {tender_txt[:500]}").content
+        comp_res = vstore.similarity_search(q_res, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)
+        comp_txt = " ".join([d.page_content for d in comp_res])
         
         db = SessionLocal()
         st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
         db.close()
         
-        res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal.")
+        prompt = f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender_txt}. Our Exp: {comp_txt}. Write proposal."
+        
+        res = llm.invoke(prompt)
         _log_token_usage(namespace, llm.model, res)
         return res.content
+
     except Exception as e:
-        return f"Error generando propuesta: {e}"
+        print(f"❌ Error generando propuesta: {e}")
+        return f"Error generando propuesta: {str(e)}"

@@ -59,10 +59,9 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 
 # A. Embeddings
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="gemini-embedding-001",
+    model="models/embedding-001",  # <--- NOMBRE EXACTO
     google_api_key=settings.GOOGLE_API_KEY
 )
-
 # B. LLM
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash", 

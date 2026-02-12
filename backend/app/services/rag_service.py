@@ -57,10 +57,64 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 
 # --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 
-# A. Embeddings
-embeddings = GoogleGenerativeAIEmbeddings(
-    model="gemini-embedding-001",  # Current embedding model (embedding-001 deprecated)
-    google_api_key=settings.GOOGLE_API_KEY
+
+class _GeminiEmbeddingsNoBatch(GoogleGenerativeAIEmbeddings):
+    """Wrapper that uses the single-request embed endpoint instead of batch.
+
+    The Gemini batchEmbedContents API can reject the model name format
+    (400 unexpected model name format). Using embed_content per document
+    avoids that. Slightly slower for large docs but reliable.
+    """
+
+    def embed_documents(
+        self,
+        texts: List[str],
+        *,
+        batch_size: int = 1,
+        task_type: Optional[str] = None,
+        titles: Optional[List[str]] = None,
+        output_dimensionality: Optional[int] = None,
+    ) -> List[List[float]]:
+        task_type = task_type or self.task_type or "RETRIEVAL_DOCUMENT"
+        out: List[List[float]] = []
+        for i, text in enumerate(texts):
+            title = titles[i] if titles and i < len(titles) else None
+            emb = self.embed_query(
+                text,
+                task_type=task_type,
+                title=title,
+                output_dimensionality=output_dimensionality,
+            )
+            out.append(emb)
+        return out
+
+    async def aembed_documents(
+        self,
+        texts: List[str],
+        *,
+        batch_size: int = 1,
+        task_type: Optional[str] = None,
+        titles: Optional[List[str]] = None,
+        output_dimensionality: Optional[int] = None,
+    ) -> List[List[float]]:
+        task_type = task_type or self.task_type or "RETRIEVAL_DOCUMENT"
+        out: List[List[float]] = []
+        for i, text in enumerate(texts):
+            title = titles[i] if titles and i < len(titles) else None
+            emb = await self.aembed_query(
+                text,
+                task_type=task_type,
+                title=title,
+                output_dimensionality=output_dimensionality,
+            )
+            out.append(emb)
+        return out
+
+
+# A. Embeddings (no-batch wrapper to avoid BatchEmbedContentsRequest model format errors)
+embeddings = _GeminiEmbeddingsNoBatch(
+    model="gemini-embedding-001",
+    google_api_key=settings.GOOGLE_API_KEY,
 )
 # B. LLM
 llm = ChatGoogleGenerativeAI(

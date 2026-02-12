@@ -27,40 +27,57 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE PERSONALIZADA PARA MANEJAR "COLD START" DE HUGGINGFACE ---
+# --- CLASE BLINDADA (NUEVA VERSIÓN CORREGIDA) ---
 class RobustHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
     """
-    Versión mejorada que espera si el modelo se está cargando (Error 503).
+    Versión que valida que HF devuelva NÚMEROS y no errores de texto.
     """
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Intentamos hasta 5 veces (aprox 30 segundos de espera total)
-        for attempt in range(5):
+        # Intentamos hasta 10 veces (damos 60 segundos al modelo para despertar)
+        for attempt in range(10):
             try:
-                return super().embed_documents(texts)
+                # Llamamos a la API
+                result = super().embed_documents(texts)
+                
+                # --- VALIDACIÓN DE SEGURIDAD (EL PARCHE) ---
+                # Si el resultado parece un error (contiene la palabra 'error' o es un diccionario), lanzamos excepción manual
+                if isinstance(result, list) and len(result) > 0:
+                    first_item = result[0]
+                    # Si el primer item no es un float ni una lista de floats, es basura.
+                    if isinstance(first_item, dict) or isinstance(first_item, str):
+                        raise ValueError(f"HF devolvió un error: {result}")
+                
+                # Si llegamos acá, son números válidos
+                return result
+
             except Exception as e:
-                # Si el error contiene "loading", esperamos
                 error_msg = str(e).lower()
-                if "loading" in error_msg or "503" in error_msg:
-                    print(f"⏳ Modelo HF cargando... Intento {attempt+1}/5. Esperando 5s...")
-                    time.sleep(5)
-                    continue
-                # Si es otro error, lo lanzamos
-                raise e
-        # Si falla después de 5 intentos, lanzamos error
-        raise RuntimeError("El modelo de HuggingFace tardó demasiado en cargar.")
+                print(f"⚠️ Intento {attempt+1}/10 fallido. HF dice: {error_msg}")
+                
+                # Si es error de carga o de quota, esperamos.
+                # Si es error de TOKEN INVALIDO, no tiene sentido reintentar.
+                if "401" in error_msg or "unauthorized" in error_msg:
+                    print("❌ ERROR DE TOKEN: Revisa tu HUGGINGFACEHUB_API_TOKEN en Render.")
+                    raise e
+                
+                print(f"⏳ Esperando 5 segundos a que el modelo despierte...")
+                time.sleep(5)
+                continue
+        
+        raise RuntimeError("HuggingFace no respondió vectores válidos después de varios intentos.")
 
     def embed_query(self, text: str) -> List[float]:
-        for attempt in range(5):
+        for attempt in range(10):
             try:
-                return super().embed_query(text)
+                result = super().embed_query(text)
+                if isinstance(result, dict) or isinstance(result, str):
+                     raise ValueError(f"HF Error: {result}")
+                return result
             except Exception as e:
-                error_msg = str(e).lower()
-                if "loading" in error_msg or "503" in error_msg:
-                    print(f"⏳ Modelo HF cargando (Query)... Esperando 5s...")
-                    time.sleep(5)
-                    continue
-                raise e
-        raise RuntimeError("El modelo de HuggingFace tardó demasiado en cargar.")
+                print(f"⏳ HF Query Loading... ({e})")
+                time.sleep(5)
+                continue
+        raise RuntimeError("HF Timeout")
 
 # --- CARGADORES (SINGLETONS) ---
 
@@ -72,7 +89,6 @@ def get_embeddings():
             print("❌ CRÍTICO: FALTA EL TOKEN DE HUGGINGFACE EN RENDER")
         
         print("☁️ Conectando a HuggingFace API (Robust Mode)...")
-        # Usamos nuestra clase blindada
         _embeddings = RobustHFEmbeddings(
             api_key=key,
             model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -139,17 +155,21 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         except: pass
 
     try:
+        # 1. Split
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_text(text)
         docs = [Document(page_content=c, metadata=metadata) for c in chunks]
         
-        # Aquí es donde ocurría el error. Ahora RobustHFEmbeddings lo manejará.
-        ids = get_vector_store().add_documents(docs, namespace=namespace)
+        print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace...")
+        
+        # 2. Embed & Upload (Usando RobustHFEmbeddings)
+        vstore = get_vector_store()
+        ids = vstore.add_documents(docs, namespace=namespace)
         
         return {"message": "Guardado exitoso (HF API) 🚀", "chunks_count": len(ids)}
     except Exception as e:
-        print(f"Error CRÍTICO Ingest: {e}")
-        # IMPORTANTE: Si ves este error en los logs, nos dirá exactamente qué pasó
+        print(f"❌ Error CRÍTICO Ingest: {e}")
+        # Al hacer raise, FastAPI devolverá el error 500 y podrás verlo en el log
         raise e
 
 def delete_document_by_source(filename: str, namespace: str):
@@ -177,17 +197,21 @@ def extract_key_data(text: str, user_id: str):
 
 def ask_gemini_with_context(question: str, namespace: str):
     try:
-        docs = get_vector_store().similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
+        # Búsqueda Robusta
+        vstore = get_vector_store()
+        docs = vstore.similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
+        
         if not docs: return {"answer": "Sin datos.", "sources": []}
         llm = get_llm()
         res = llm.invoke(f"Contexto: {' '.join([d.page_content for d in docs])}\nPregunta: {question}")
         _log_token_usage(namespace, llm.model, res)
         return {"answer": res.content, "sources": ["match"]}
-    except Exception as e: return {"answer": "Error", "error": str(e)}
+    except Exception as e: return {"answer": f"Error: {str(e)}", "error": str(e)}
 
 def stream_ask_gemini(question: str, namespace: str):
     try:
-        docs = get_vector_store().similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
+        vstore = get_vector_store()
+        docs = vstore.similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
         chain = PromptTemplate.from_template(f"Contexto: {' '.join([d.page_content for d in docs]) if docs else ''}\nPregunta: {question}") | get_llm() | StrOutputParser()
         for chunk in chain.stream({}): yield chunk
     except Exception as e: yield f"Error: {e}"
@@ -195,16 +219,17 @@ def stream_ask_gemini(question: str, namespace: str):
 def generate_proposal_draft(namespace: str):
     vstore = get_vector_store()
     llm = get_llm()
-    tender = " ".join([d.page_content for d in vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)])
-    
-    # Búsqueda inteligente
-    q = llm.invoke(f"Search query based on: {tender[:500]}").content
-    company = " ".join([d.page_content for d in vstore.similarity_search(q, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)])
-    
-    db = SessionLocal()
-    st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
-    db.close()
-    
-    res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal.")
-    _log_token_usage(namespace, llm.model, res)
-    return res.content
+    try:
+        tender = " ".join([d.page_content for d in vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)])
+        q = llm.invoke(f"Search query based on: {tender[:500]}").content
+        company = " ".join([d.page_content for d in vstore.similarity_search(q, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)])
+        
+        db = SessionLocal()
+        st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
+        db.close()
+        
+        res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal.")
+        _log_token_usage(namespace, llm.model, res)
+        return res.content
+    except Exception as e:
+        return f"Error generando propuesta: {e}"

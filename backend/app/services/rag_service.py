@@ -59,7 +59,7 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 
 # A. Embeddings
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001",  # <--- NOMBRE EXACTO
+    model="gemini-embedding-001",  # Current embedding model (embedding-001 deprecated)
     google_api_key=settings.GOOGLE_API_KEY
 )
 # B. LLM

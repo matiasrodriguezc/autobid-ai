@@ -59,7 +59,7 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 
 # A. Embeddings
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004", # <--- AHORA SÍ, con las librerías nuevas, esto es obligatorio.
+    model="models/text-embedding-001", # <--- AHORA SÍ, con las librerías nuevas, esto es obligatorio.
     google_api_key=settings.GOOGLE_API_KEY,
     task_type="retrieval_document" 
 )

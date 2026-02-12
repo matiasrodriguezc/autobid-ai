@@ -4,7 +4,7 @@ import time
 import requests
 from typing import List, Dict, Any, Optional
 
-# Importamos Embeddings base para cumplir con la interfaz, pero no usamos su lógica
+# Interfaces base
 from langchain_core.embeddings import Embeddings 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
@@ -27,78 +27,75 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE GOOGLE RAW REST (Sin librerías raras) ---
-class GoogleRawRESTEmbeddings(Embeddings):
+# --- CLASE GOOGLE REST "UNO A UNO" (Bulletproof) ---
+class GoogleSimpleRESTEmbeddings(Embeddings):
     """
-    Se conecta a la API REST de Google manualmente.
-    Evita los errores de gRPC y los bloqueos de librerías en Render.
+    Conecta a Google API (REST) vectorizando uno por uno para evitar errores de Batch.
+    Modelo: embedding-001 (768 dims).
     """
     def __init__(self, api_key):
         self.api_key = api_key
-        # Usamos embedding-001 que es el más estable para REST
         self.model_name = "models/embedding-001"
-        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
+        # Usamos el endpoint singular ':embedContent', es el más robusto de todos
+        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:embedContent?key={self.api_key}"
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Google permite hasta 100 textos por batch en REST, pero somos conservadores con 20
-        batch_size = 20
-        all_embeddings = []
-
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i+batch_size]
-            
-            # Construimos el JSON a mano según la documentación oficial REST de Google
-            payload = {
-                "requests": [
-                    {
-                        "model": self.model_name,
-                        "content": {"parts": [{"text": text}]}
-                    } for text in batch
-                ]
-            }
-
+    def _embed_single_text(self, text: str) -> List[float]:
+        # Payload simple para un solo texto
+        payload = {
+            "model": self.model_name,
+            "content": {"parts": [{"text": text}]}
+        }
+        
+        # Reintentos básicos por si la red parpadea
+        for attempt in range(3):
             try:
-                # Petición POST directa
                 response = requests.post(
                     self.api_url, 
                     headers={"Content-Type": "application/json"},
                     json=payload,
-                    timeout=30
+                    timeout=10
                 )
-
+                
                 if response.status_code != 200:
-                    raise ValueError(f"Google REST Error {response.status_code}: {response.text}")
-
+                    # Si falla, lanzamos error con el texto de Google para ver qué pasa
+                    raise ValueError(f"Google Error {response.status_code}: {response.text}")
+                
                 data = response.json()
                 
-                # Extraemos los vectores de la respuesta JSON
-                if "embeddings" in data:
-                    for item in data["embeddings"]:
-                        all_embeddings.append(item["values"])
+                # La estructura singular es {'embedding': {'values': [...]}}
+                if "embedding" in data and "values" in data["embedding"]:
+                    return data["embedding"]["values"]
                 else:
-                    raise ValueError(f"Respuesta inesperada de Google: {data}")
+                    raise ValueError(f"JSON inesperado: {data}")
 
             except Exception as e:
-                print(f"⚠️ Error Batch Google REST: {e}")
-                print("⏳ Reintentando en 2 segundos...")
-                time.sleep(2)
-                # Un reintento simple
-                try:
-                    response = requests.post(self.api_url, headers={"Content-Type": "application/json"}, json=payload)
-                    data = response.json()
-                    for item in data["embeddings"]:
-                        all_embeddings.append(item["values"])
-                except Exception as e2:
-                    raise RuntimeError(f"Falló Google REST definitivamente: {e2}")
+                print(f"⚠️ Error vectorizando texto (Intento {attempt+1}): {e}")
+                time.sleep(1)
+        
+        raise RuntimeError("No se pudo vectorizar el texto con Google tras 3 intentos.")
 
-        return all_embeddings
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        # Procesamos la lista uno por uno
+        results = []
+        total = len(texts)
+        print(f"⚡ Google REST: Procesando {total} vectores uno a uno...")
+        
+        for i, text in enumerate(texts):
+            try:
+                vec = self._embed_single_text(text)
+                results.append(vec)
+                # Pequeña pausa para no saturar el Rate Limit de la API Key gratuita
+                time.sleep(0.2) 
+            except Exception as e:
+                print(f"❌ Falló el vector {i}: {e}")
+                raise e
+                
+        return results
 
     def embed_query(self, text: str) -> List[float]:
-        # Para una sola query usamos el endpoint singular o reutilizamos el batch de 1
-        result = self.embed_documents([text])
-        return result[0]
+        return self._embed_single_text(text)
 
-# --- CARGADORES (SINGLETONS) ---
+# --- CARGADORES ---
 
 def get_embeddings():
     global _embeddings
@@ -107,8 +104,8 @@ def get_embeddings():
         if not key:
             print("❌ CRÍTICO: FALTA GOOGLE_API_KEY")
         
-        print("⚡ Conectando a Google REST (Manual Mode)...")
-        _embeddings = GoogleRawRESTEmbeddings(api_key=key)
+        print("⚡ Conectando a Google REST (Simple Mode)...")
+        _embeddings = GoogleSimpleRESTEmbeddings(api_key=key)
     return _embeddings
 
 def get_vector_store():
@@ -154,7 +151,7 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
             db.close()
     except: pass
 
-# --- LOGICA DE NEGOCIO ---
+# --- NEGOCIO ---
 
 def clear_active_tender(namespace: str):
     try: get_pc_index().delete(filter={"category": "active_tender"}, namespace=namespace)
@@ -175,8 +172,7 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         chunks = splitter.split_text(text)
         docs = [Document(page_content=c, metadata=metadata) for c in chunks]
         
-        print(f"📡 Vectorizando {len(chunks)} fragmentos vía Google REST...")
-        
+        print(f"📡 Vectorizando {len(chunks)} fragmentos...")
         ids = get_vector_store().add_documents(docs, namespace=namespace)
         
         return {"message": "Guardado exitoso (Google REST) 🚀", "chunks_count": len(ids)}

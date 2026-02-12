@@ -7,21 +7,24 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
 
-# --- ACTUALIZADAS PARA SOPORTAR GEMINI NUEVO Y EMBEDDINGS-004 ---
+# --- IA & LANGCHAIN (Versiones Modernas) ---
 google-generativeai>=0.7.0
 langchain>=0.2.0
 langchain-community>=0.2.0
 langchain-google-genai>=1.0.0
-# ----------------------------------------------------------------
 
-pinecone-client==3.1.0
+# --- PINECONE FIX (CRÍTICO) ---
+# Forzamos versiones nuevas para que exista 'PineconeVectorStore'
+langchain-pinecone>=0.1.0
+pinecone-client>=3.1.0
+
+# --- DATA & UTILS ---
 scikit-learn==1.4.0
 pandas==2.2.0
 shap==0.44.1
 presidio-analyzer==2.2.351
 presidio-anonymizer==2.2.351
 pypdf==4.0.1
-langchain-pinecone
 pdfplumber
 python-jose[cryptography]
 requests

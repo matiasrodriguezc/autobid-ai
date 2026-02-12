@@ -26,3 +26,5 @@ pypdf==4.0.1
 pdfplumber
 python-jose[cryptography]
 requests
+
+sentence-transformers==2.5.1

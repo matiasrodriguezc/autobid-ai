@@ -22,6 +22,7 @@ from pinecone import Pinecone
 # Configuración
 from app.core.config import settings
 
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # --- HELPER DE LOGGING (NUEVO) ---
 def _log_token_usage(user_id: str, model_name: str, response: Any):
@@ -61,11 +62,8 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 from google.api_core import client_options as client_options_lib
 
 # 2. Configuración ROBUSTA de Embeddings
-embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004", 
-    google_api_key=settings.GOOGLE_API_KEY,
-    # Forzamos transporte REST para evitar errores de gRPC en Render
-    client_options={"transport": "rest"}
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 # B. LLM
 llm = ChatGoogleGenerativeAI(

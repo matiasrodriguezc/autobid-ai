@@ -6,10 +6,12 @@ pydantic-settings==2.1.0
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
-google-generativeai==0.3.2
-langchain==0.1.10
-langchain-community==0.0.27
-langchain-google-genai==0.0.9
+# --- CAMBIO CRÍTICO AQUÍ ---
+google-generativeai>=0.7.0
+langchain-google-genai>=1.0.3
+langchain>=0.2.0
+langchain-community>=0.2.0
+# ---------------------------
 pinecone-client==3.1.0
 scikit-learn==1.4.0
 pandas==2.2.0
@@ -21,5 +23,3 @@ langchain-pinecone
 pdfplumber
 python-jose[cryptography]
 requests
-python-multipart
-shap==0.44.1

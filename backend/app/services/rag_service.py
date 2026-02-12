@@ -57,77 +57,13 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 
 # --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 
-
-class _GeminiEmbeddingsNoBatch(GoogleGenerativeAIEmbeddings):
-    """Wrapper that uses the single-request embed endpoint instead of batch.
-
-    The Gemini batchEmbedContents API can reject the model name format
-    (400 unexpected model name format). Using embed_content per document
-    avoids that. Slightly slower for large docs but reliable.
-
-    Must call self.client.embed_content() directly: the base embed_query
-    delegates to embed_documents, so calling embed_query from here
-    would cause infinite recursion.
-    """
-
-    def embed_documents(
-        self,
-        texts: List[str],
-        *,
-        batch_size: int = 1,
-        task_type: Optional[str] = None,
-        titles: Optional[List[str]] = None,
-        output_dimensionality: Optional[int] = None,
-    ) -> List[List[float]]:
-        from langchain_google_genai._common import GoogleGenerativeAIError
-
-        task_type = task_type or self.task_type or "RETRIEVAL_DOCUMENT"
-        out: List[List[float]] = []
-        for i, text in enumerate(texts):
-            title = titles[i] if titles and i < len(titles) else None
-            request = self._prepare_request(
-                text=text,
-                task_type=task_type,
-                title=title,
-                output_dimensionality=output_dimensionality,
-            )
-            try:
-                result = self.client.embed_content(request)
-            except Exception as e:
-                raise GoogleGenerativeAIError(f"Error embedding content: {e}") from e
-            out.append(list(result.embedding.values))
-        return out
-
-    async def aembed_documents(
-        self,
-        texts: List[str],
-        *,
-        batch_size: int = 1,
-        task_type: Optional[str] = None,
-        titles: Optional[List[str]] = None,
-        output_dimensionality: Optional[int] = None,
-    ) -> List[List[float]]:
-        import asyncio
-
-        # Avoid batch API and recursion: run sync single-request path in executor
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None,
-            lambda: self.embed_documents(
-                texts,
-                batch_size=batch_size,
-                task_type=task_type,
-                titles=titles,
-                output_dimensionality=output_dimensionality,
-            ),
-        )
-
-
-# A. Embeddings (no-batch wrapper to avoid BatchEmbedContentsRequest model format errors)
-embeddings = _GeminiEmbeddingsNoBatch(
-    model="gemini-embedding-001",
+# A. Embeddings
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/text-embedding-004", 
     google_api_key=settings.GOOGLE_API_KEY,
+    task_type="retrieval_document" 
 )
+
 # B. LLM
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash", 

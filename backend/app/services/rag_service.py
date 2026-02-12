@@ -27,74 +27,66 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE GOOGLE REST PURA (MODELO 004 - 768 DIMS) ---
 class GoogleRawRESTEmbeddings(Embeddings):
     """
-    Conecta vía HTTP POST directo a Google.
-    Modelo: models/text-embedding-004 (El estándar actual de 768 dims).
+    Google Gemini Embeddings REST
+    Modelo estable actual: models/embedding-001
+    Dimensiones: 768
     """
-    def __init__(self, api_key):
+
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        # Usamos el 004 que es la versión estable actual de lo que viste en la doc
-        self.model_name = "models/text-embedding-005"
-        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:embedContent?key={self.api_key}"
+        self.model_name = "models/embedding-001"
+        self.api_url = (
+            f"https://generativelanguage.googleapis.com/v1beta/"
+            f"{self.model_name}:embedContent?key={self.api_key}"
+        )
 
     def _embed_single(self, text: str) -> List[float]:
-        # Limpieza básica
         clean_text = text.replace("\n", " ").strip()
-        
+
         payload = {
             "model": self.model_name,
-            "content": {"parts": [{"text": clean_text}]}
+            "content": {
+                "parts": [{"text": clean_text}]
+            }
         }
-        
+
         for attempt in range(3):
             try:
                 response = requests.post(
-                    self.api_url, 
+                    self.api_url,
                     headers={"Content-Type": "application/json"},
                     json=payload,
-                    timeout=10
+                    timeout=15,
                 )
-                
+
                 if response.status_code != 200:
                     print(f"⚠️ Google Error {response.status_code}: {response.text}")
-                    if response.status_code == 429: # Rate Limit
+
+                    if response.status_code == 429:
                         time.sleep(2)
                         continue
-                    raise ValueError(f"Google API Error: {response.text}")
+
+                    raise RuntimeError(response.text)
 
                 data = response.json()
-                
-                if "embedding" in data and "values" in data["embedding"]:
-                    return data["embedding"]["values"]
-                else:
-                    raise ValueError(f"JSON inesperado: {data}")
+
+                # Formato correcto actual
+                return data["embedding"]["values"]
 
             except Exception as e:
-                print(f"⚠️ Reintento {attempt+1}: {e}")
+                print(f"⚠️ Retry {attempt+1}: {e}")
                 time.sleep(1)
-        
-        raise RuntimeError("Fallo total al conectar con Google Embeddings.")
+
+        raise RuntimeError("Fallo total embedding-001.")
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        results = []
-        print(f"⚡ Procesando {len(texts)} vectores con Google 004 REST...")
-        
-        for i, text in enumerate(texts):
-            try:
-                vec = self._embed_single(text)
-                results.append(vec)
-                # Pausa mínima para no saturar
-                time.sleep(0.05) 
-            except Exception as e:
-                print(f"❌ Falló texto {i}")
-                raise e
-        return results
+        print(f"⚡ Procesando {len(texts)} textos con embedding-001...")
+        return [self._embed_single(t) for t in texts]
 
     def embed_query(self, text: str) -> List[float]:
         return self._embed_single(text)
-
 # --- CARGADORES ---
 
 def get_embeddings():

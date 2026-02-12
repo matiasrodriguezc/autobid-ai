@@ -27,52 +27,59 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE BLINDADA (VERSIÓN 3 - URL FIX) ---
-class RobustHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
-    """
-    Versión que valida vectores y fuerza la URL nueva.
-    """
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        for attempt in range(10):
-            try:
-                # 1. Llamada a la API
-                result = super().embed_documents(texts)
-                
-                # 2. VALIDACIÓN ESTRICTA
-                if not isinstance(result, list):
-                    raise ValueError(f"HF API devolvió un formato inválido: {result}")
-                
-                if len(result) > 0 and (not isinstance(result[0], list) or isinstance(result[0], str)):
-                     raise ValueError(f"HF API devolvió datos inválidos: {result}")
+# --- CLASE MANUAL (DIRECT HTTP REQUEST) ---
+# Esta clase ignora la lógica interna de LangChain y llama directamente a la API
+class ManualHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
+    
+    def __init__(self, api_key, model_name):
+        self.api_key = api_key
+        self.model_name = model_name
+        # URL NUEVA FORZADA
+        self.api_url = f"https://router.huggingface.co/hf-inference/models/{model_name}"
 
-                return result
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        # "wait_for_model": True hace que HF espere en el servidor en vez de dar error 503
+        payload = {"inputs": texts, "options": {"wait_for_model": True}}
+
+        for attempt in range(5):
+            try:
+                response = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
+                
+                # Si falla por status code (ej 500, 404, etc)
+                if response.status_code != 200:
+                    raise ValueError(f"Error {response.status_code}: {response.text}")
+
+                data = response.json()
+
+                # Validación de Errores en el JSON
+                if isinstance(data, dict) and "error" in data:
+                    raise ValueError(f"HF Error JSON: {data}")
+
+                # Validación de Formato (Debe ser lista de listas)
+                if isinstance(data, list) and len(data) > 0:
+                    if isinstance(data[0], list):
+                        return data # ¡Éxito!
+                    else:
+                        raise ValueError(f"Formato inesperado (no es lista de vectores): {data}")
+                
+                raise ValueError(f"Respuesta vacía o incorrecta: {data}")
 
             except Exception as e:
-                error_msg = str(e).lower()
-                print(f"⚠️ Intento {attempt+1}/10 fallido. HF Status: {error_msg}")
-                
-                if "401" in error_msg or "unauthorized" in error_msg:
-                    print("❌ ERROR DE TOKEN: Revisa HUGGINGFACEHUB_API_TOKEN en Render.")
+                print(f"⚠️ Intento {attempt+1}/5 fallido. Error: {e}")
+                if "401" in str(e):
+                    print("❌ TOKEN INVALIDO.")
                     raise e
                 
-                print(f"⏳ Esperando 5 segundos a que el modelo despierte...")
-                time.sleep(5)
-                continue
+                print("⏳ Reintentando en 3 segundos...")
+                time.sleep(3)
         
-        raise RuntimeError("HuggingFace no respondió vectores válidos tras 10 intentos.")
+        raise RuntimeError("Falló la conexión manual con HuggingFace tras 5 intentos.")
 
     def embed_query(self, text: str) -> List[float]:
-        for attempt in range(10):
-            try:
-                result = super().embed_query(text)
-                if not isinstance(result, list):
-                    raise ValueError(f"HF Error: {result}")
-                return result
-            except Exception as e:
-                print(f"⏳ HF Query Loading... ({e})")
-                time.sleep(5)
-                continue
-        raise RuntimeError("HF Timeout")
+        # Reutilizamos la lógica de documentos para una sola query
+        result = self.embed_documents([text])
+        return result[0]
 
 # --- CARGADORES (SINGLETONS) ---
 
@@ -81,19 +88,13 @@ def get_embeddings():
     if _embeddings is None:
         key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         if not key:
-            print("❌ CRÍTICO: FALTA EL TOKEN DE HUGGINGFACE EN RENDER")
+            print("❌ CRÍTICO: FALTA TOKEN HF")
         
-        print("☁️ Conectando a HuggingFace API (New Router URL)...")
-        
-        # --- AQUÍ ESTÁ EL ARREGLO CLAVE ---
-        # Forzamos la URL nueva que pide el error
-        model = "sentence-transformers/all-MiniLM-L6-v2"
-        api_url = f"https://router.huggingface.co/hf-inference/models/{model}"
-        
-        _embeddings = RobustHFEmbeddings(
+        print("☁️ Conectando a HuggingFace (Modo Manual Directo)...")
+        # Usamos nuestra clase manual
+        _embeddings = ManualHFEmbeddings(
             api_key=key,
-            model_name=model,
-            api_url=api_url  # <--- ESTO SOLUCIONA EL ERROR DE "NO SUPPORTED"
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
     return _embeddings
 
@@ -150,7 +151,6 @@ def ingest_text(text: str, metadata: dict, namespace: str):
     if not text: return {"error": "Texto vacío"}
     text = text.replace("\x00", "")
     
-    # Lazy Import de privacidad
     if metadata.get("category") != "active_tender":
         try:
             from app.utils.privacy import sanitize_text
@@ -162,11 +162,11 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         chunks = splitter.split_text(text)
         docs = [Document(page_content=c, metadata=metadata) for c in chunks]
         
-        print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace Router...")
+        print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace (Directo)...")
         
         ids = get_vector_store().add_documents(docs, namespace=namespace)
         
-        return {"message": "Guardado exitoso (HF Router) 🚀", "chunks_count": len(ids)}
+        return {"message": "Guardado exitoso (HF Direct) 🚀", "chunks_count": len(ids)}
     except Exception as e:
         print(f"❌ Error CRÍTICO Ingest: {e}")
         raise e
@@ -215,28 +215,16 @@ def generate_proposal_draft(namespace: str):
     vstore = get_vector_store()
     llm = get_llm()
     try:
-        # 1. Buscar info del Tender
-        tender_res = vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)
-        tender_txt = " ".join([d.page_content for d in tender_res])
-
-        # 2. Buscar info de la Empresa (Smart Search)
-        q_res = llm.invoke(f"Search query based on: {tender_txt[:500]}").content
-        comp_res = vstore.similarity_search(q_res, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)
-        comp_txt = " ".join([d.page_content for d in comp_res])
+        tender = " ".join([d.page_content for d in vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)])
+        q = llm.invoke(f"Search query based on: {tender[:500]}").content
+        company = " ".join([d.page_content for d in vstore.similarity_search(q, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)])
         
-        # 3. Obtener datos de la DB
         db = SessionLocal()
         st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
         db.close()
         
-        # 4. Generar Prompt
-        prompt = f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender_txt}. Our Exp: {comp_txt}. Write proposal."
-        
-        # 5. Invocar LLM
-        res = llm.invoke(prompt)
+        res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal.")
         _log_token_usage(namespace, llm.model, res)
         return res.content
-
     except Exception as e:
-        print(f"❌ Error generando propuesta: {e}")
-        return f"Error generando propuesta: {str(e)}"
+        return f"Error generando propuesta: {e}"

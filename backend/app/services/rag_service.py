@@ -11,7 +11,6 @@ from langchain.schema import StrOutputParser
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings # Modelo Local
-from app.utils.privacy import sanitize_text
 
 # Base de datos SQL
 from app.db.session import SessionLocal
@@ -24,8 +23,10 @@ from pinecone import Pinecone
 from app.core.config import settings
 from google.api_core import client_options as client_options_lib
 
+# --- IMPORTANTE: QUITAMOS EL IMPORT DE PRIVACY DE AQUÍ ---
+# from app.utils.privacy import sanitize_text  <--- ESTO BLOQUEABA EL ARRANQUE
+
 # --- VARIABLES GLOBALES (LAZY LOADING) ---
-# No inicializamos nada aquí para que el servidor arranque rápido.
 _embeddings = None
 _vector_store = None
 _pc_index = None
@@ -66,7 +67,11 @@ def get_embeddings():
     global _embeddings
     if _embeddings is None:
         print("🧠 Cargando modelo de Embeddings Local (all-MiniLM-L6-v2)...")
-        _embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        # Usamos CPU explícitamente para evitar problemas de CUDA en Render Free
+        _embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={'device': 'cpu'} 
+        )
         print("✅ Modelo cargado.")
     return _embeddings
 
@@ -76,7 +81,7 @@ def get_vector_store():
     if _vector_store is None:
         _vector_store = PineconeVectorStore(
             index_name=index_name,
-            embedding=get_embeddings(), # Llama al cargador
+            embedding=get_embeddings(), 
             pinecone_api_key=settings.PINECONE_API_KEY
         )
     return _vector_store
@@ -119,10 +124,16 @@ def ingest_text(text: str, metadata: dict, namespace: str):
     
     if is_knowledge_base:
         try:
+            # --- TRUCO DE RENDIMIENTO: IMPORT LOCAL ---
+            # Importamos 'privacy' AQUÍ dentro. Así el servidor arranca rápido
+            # y solo carga Presidio/Spacy cuando alguien sube un archivo real.
+            print("🛡️ Cargando módulo de privacidad bajo demanda...")
+            from app.utils.privacy import sanitize_text
+            
             text = sanitize_text(text)
             print(f"🛡️ PII Redaction aplicado.")
         except Exception as e:
-            print(f"⚠️ Falló la limpieza PII: {e}")
+            print(f"⚠️ Falló la limpieza PII o la carga del módulo: {e}")
 
     print(f"--- INGESTANDO TEXTO ({len(text)} chars) para User: {namespace} ---")
     try:

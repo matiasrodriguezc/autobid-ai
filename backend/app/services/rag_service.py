@@ -27,10 +27,10 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE BLINDADA (VERSIÓN CORREGIDA V2) ---
+# --- CLASE BLINDADA (VERSIÓN 3 - URL FIX) ---
 class RobustHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
     """
-    Versión corregida que valida estrictamente que recibamos una LISTA de vectores.
+    Versión que valida vectores y fuerza la URL nueva.
     """
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         for attempt in range(10):
@@ -39,27 +39,22 @@ class RobustHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
                 result = super().embed_documents(texts)
                 
                 # 2. VALIDACIÓN ESTRICTA
-                # Si NO es una lista, es un error (ej: dict {'error': '...'})
                 if not isinstance(result, list):
-                    raise ValueError(f"HF API devolvió un formato inválido (probablemente error): {result}")
+                    raise ValueError(f"HF API devolvió un formato inválido: {result}")
                 
-                # Si la lista está vacía o el primer elemento no es una lista de floats (vector), es error
                 if len(result) > 0 and (not isinstance(result[0], list) or isinstance(result[0], str)):
                      raise ValueError(f"HF API devolvió datos inválidos: {result}")
 
-                # Si pasamos las validaciones, retornamos
                 return result
 
             except Exception as e:
                 error_msg = str(e).lower()
                 print(f"⚠️ Intento {attempt+1}/10 fallido. HF Status: {error_msg}")
                 
-                # Errores fatales (Token)
                 if "401" in error_msg or "unauthorized" in error_msg:
                     print("❌ ERROR DE TOKEN: Revisa HUGGINGFACEHUB_API_TOKEN en Render.")
                     raise e
                 
-                # Errores temporales (Loading / 503)
                 print(f"⏳ Esperando 5 segundos a que el modelo despierte...")
                 time.sleep(5)
                 continue
@@ -88,10 +83,17 @@ def get_embeddings():
         if not key:
             print("❌ CRÍTICO: FALTA EL TOKEN DE HUGGINGFACE EN RENDER")
         
-        print("☁️ Conectando a HuggingFace API (Robust Mode V2)...")
+        print("☁️ Conectando a HuggingFace API (New Router URL)...")
+        
+        # --- AQUÍ ESTÁ EL ARREGLO CLAVE ---
+        # Forzamos la URL nueva que pide el error
+        model = "sentence-transformers/all-MiniLM-L6-v2"
+        api_url = f"https://router.huggingface.co/hf-inference/models/{model}"
+        
         _embeddings = RobustHFEmbeddings(
             api_key=key,
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
+            model_name=model,
+            api_url=api_url  # <--- ESTO SOLUCIONA EL ERROR DE "NO SUPPORTED"
         )
     return _embeddings
 
@@ -160,15 +162,13 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         chunks = splitter.split_text(text)
         docs = [Document(page_content=c, metadata=metadata) for c in chunks]
         
-        print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace...")
+        print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace Router...")
         
-        # Aquí RobustHFEmbeddings hará la magia (reintentar si falla)
         ids = get_vector_store().add_documents(docs, namespace=namespace)
         
-        return {"message": "Guardado exitoso (HF API) 🚀", "chunks_count": len(ids)}
+        return {"message": "Guardado exitoso (HF Router) 🚀", "chunks_count": len(ids)}
     except Exception as e:
         print(f"❌ Error CRÍTICO Ingest: {e}")
-        # IMPORTANTE: No suprimimos el error, lo lanzamos para que se vea en el frontend si es necesario
         raise e
 
 def delete_document_by_source(filename: str, namespace: str):
@@ -221,10 +221,3 @@ def generate_proposal_draft(namespace: str):
         
         db = SessionLocal()
         st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
-        db.close()
-        
-        res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal.")
-        _log_token_usage(namespace, llm.model, res)
-        return res.content
-    except Exception as e:
-        return f"Error generando propuesta: {e}"

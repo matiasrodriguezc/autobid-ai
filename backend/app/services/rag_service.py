@@ -58,12 +58,15 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
 # --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 
 # A. Embeddings
-embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004",  # <--- Usamos el NUEVO y POTENTE
-    google_api_key=settings.GOOGLE_API_KEY
-    # task_type="retrieval_document"    <--- ¡COMENTÁ O BORRÁ ESTA LÍNEA!
-)
+from google.api_core import client_options as client_options_lib
 
+# 2. Configuración ROBUSTA de Embeddings
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/text-embedding-004", 
+    google_api_key=settings.GOOGLE_API_KEY,
+    # Forzamos transporte REST para evitar errores de gRPC en Render
+    client_options={"transport": "rest"}
+)
 # B. LLM
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash", 

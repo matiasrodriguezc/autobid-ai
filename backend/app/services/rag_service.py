@@ -215,9 +215,28 @@ def generate_proposal_draft(namespace: str):
     vstore = get_vector_store()
     llm = get_llm()
     try:
-        tender = " ".join([d.page_content for d in vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)])
-        q = llm.invoke(f"Search query based on: {tender[:500]}").content
-        company = " ".join([d.page_content for d in vstore.similarity_search(q, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)])
+        # 1. Buscar info del Tender
+        tender_res = vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)
+        tender_txt = " ".join([d.page_content for d in tender_res])
+
+        # 2. Buscar info de la Empresa (Smart Search)
+        q_res = llm.invoke(f"Search query based on: {tender_txt[:500]}").content
+        comp_res = vstore.similarity_search(q_res, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)
+        comp_txt = " ".join([d.page_content for d in comp_res])
         
+        # 3. Obtener datos de la DB
         db = SessionLocal()
         st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
+        db.close()
+        
+        # 4. Generar Prompt
+        prompt = f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender_txt}. Our Exp: {comp_txt}. Write proposal."
+        
+        # 5. Invocar LLM
+        res = llm.invoke(prompt)
+        _log_token_usage(namespace, llm.model, res)
+        return res.content
+
+    except Exception as e:
+        print(f"❌ Error generando propuesta: {e}")
+        return f"Error generando propuesta: {str(e)}"

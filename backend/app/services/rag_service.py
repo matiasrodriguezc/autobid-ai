@@ -30,15 +30,16 @@ index_name = "autobid-index"
 class GoogleRawRESTEmbeddings(Embeddings):
     """
     Google Gemini Embeddings REST
-    Modelo estable actual: models/embedding-001
+    Modelo actual: models/embedding-001
     Dimensiones: 768
+    API: v1 (NO v1beta)
     """
 
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.model_name = "models/embedding-001"
         self.api_url = (
-            f"https://generativelanguage.googleapis.com/v1beta/"
+            f"https://generativelanguage.googleapis.com/v1/"
             f"{self.model_name}:embedContent?key={self.api_key}"
         )
 
@@ -72,7 +73,6 @@ class GoogleRawRESTEmbeddings(Embeddings):
 
                 data = response.json()
 
-                # Formato correcto actual
                 return data["embedding"]["values"]
 
             except Exception as e:

@@ -27,51 +27,51 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE BLINDADA (NUEVA VERSIÓN CORREGIDA) ---
+# --- CLASE BLINDADA (VERSIÓN CORREGIDA V2) ---
 class RobustHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
     """
-    Versión que valida que HF devuelva NÚMEROS y no errores de texto.
+    Versión corregida que valida estrictamente que recibamos una LISTA de vectores.
     """
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Intentamos hasta 10 veces (damos 60 segundos al modelo para despertar)
         for attempt in range(10):
             try:
-                # Llamamos a la API
+                # 1. Llamada a la API
                 result = super().embed_documents(texts)
                 
-                # --- VALIDACIÓN DE SEGURIDAD (EL PARCHE) ---
-                # Si el resultado parece un error (contiene la palabra 'error' o es un diccionario), lanzamos excepción manual
-                if isinstance(result, list) and len(result) > 0:
-                    first_item = result[0]
-                    # Si el primer item no es un float ni una lista de floats, es basura.
-                    if isinstance(first_item, dict) or isinstance(first_item, str):
-                        raise ValueError(f"HF devolvió un error: {result}")
+                # 2. VALIDACIÓN ESTRICTA
+                # Si NO es una lista, es un error (ej: dict {'error': '...'})
+                if not isinstance(result, list):
+                    raise ValueError(f"HF API devolvió un formato inválido (probablemente error): {result}")
                 
-                # Si llegamos acá, son números válidos
+                # Si la lista está vacía o el primer elemento no es una lista de floats (vector), es error
+                if len(result) > 0 and (not isinstance(result[0], list) or isinstance(result[0], str)):
+                     raise ValueError(f"HF API devolvió datos inválidos: {result}")
+
+                # Si pasamos las validaciones, retornamos
                 return result
 
             except Exception as e:
                 error_msg = str(e).lower()
-                print(f"⚠️ Intento {attempt+1}/10 fallido. HF dice: {error_msg}")
+                print(f"⚠️ Intento {attempt+1}/10 fallido. HF Status: {error_msg}")
                 
-                # Si es error de carga o de quota, esperamos.
-                # Si es error de TOKEN INVALIDO, no tiene sentido reintentar.
+                # Errores fatales (Token)
                 if "401" in error_msg or "unauthorized" in error_msg:
-                    print("❌ ERROR DE TOKEN: Revisa tu HUGGINGFACEHUB_API_TOKEN en Render.")
+                    print("❌ ERROR DE TOKEN: Revisa HUGGINGFACEHUB_API_TOKEN en Render.")
                     raise e
                 
+                # Errores temporales (Loading / 503)
                 print(f"⏳ Esperando 5 segundos a que el modelo despierte...")
                 time.sleep(5)
                 continue
         
-        raise RuntimeError("HuggingFace no respondió vectores válidos después de varios intentos.")
+        raise RuntimeError("HuggingFace no respondió vectores válidos tras 10 intentos.")
 
     def embed_query(self, text: str) -> List[float]:
         for attempt in range(10):
             try:
                 result = super().embed_query(text)
-                if isinstance(result, dict) or isinstance(result, str):
-                     raise ValueError(f"HF Error: {result}")
+                if not isinstance(result, list):
+                    raise ValueError(f"HF Error: {result}")
                 return result
             except Exception as e:
                 print(f"⏳ HF Query Loading... ({e})")
@@ -88,7 +88,7 @@ def get_embeddings():
         if not key:
             print("❌ CRÍTICO: FALTA EL TOKEN DE HUGGINGFACE EN RENDER")
         
-        print("☁️ Conectando a HuggingFace API (Robust Mode)...")
+        print("☁️ Conectando a HuggingFace API (Robust Mode V2)...")
         _embeddings = RobustHFEmbeddings(
             api_key=key,
             model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -148,6 +148,7 @@ def ingest_text(text: str, metadata: dict, namespace: str):
     if not text: return {"error": "Texto vacío"}
     text = text.replace("\x00", "")
     
+    # Lazy Import de privacidad
     if metadata.get("category") != "active_tender":
         try:
             from app.utils.privacy import sanitize_text
@@ -155,21 +156,19 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         except: pass
 
     try:
-        # 1. Split
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_text(text)
         docs = [Document(page_content=c, metadata=metadata) for c in chunks]
         
         print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace...")
         
-        # 2. Embed & Upload (Usando RobustHFEmbeddings)
-        vstore = get_vector_store()
-        ids = vstore.add_documents(docs, namespace=namespace)
+        # Aquí RobustHFEmbeddings hará la magia (reintentar si falla)
+        ids = get_vector_store().add_documents(docs, namespace=namespace)
         
         return {"message": "Guardado exitoso (HF API) 🚀", "chunks_count": len(ids)}
     except Exception as e:
         print(f"❌ Error CRÍTICO Ingest: {e}")
-        # Al hacer raise, FastAPI devolverá el error 500 y podrás verlo en el log
+        # IMPORTANTE: No suprimimos el error, lo lanzamos para que se vea en el frontend si es necesario
         raise e
 
 def delete_document_by_source(filename: str, namespace: str):
@@ -197,10 +196,7 @@ def extract_key_data(text: str, user_id: str):
 
 def ask_gemini_with_context(question: str, namespace: str):
     try:
-        # Búsqueda Robusta
-        vstore = get_vector_store()
-        docs = vstore.similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
-        
+        docs = get_vector_store().similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
         if not docs: return {"answer": "Sin datos.", "sources": []}
         llm = get_llm()
         res = llm.invoke(f"Contexto: {' '.join([d.page_content for d in docs])}\nPregunta: {question}")
@@ -210,8 +206,7 @@ def ask_gemini_with_context(question: str, namespace: str):
 
 def stream_ask_gemini(question: str, namespace: str):
     try:
-        vstore = get_vector_store()
-        docs = vstore.similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
+        docs = get_vector_store().similarity_search(question, k=5, filter={"category": "active_tender"}, namespace=namespace)
         chain = PromptTemplate.from_template(f"Contexto: {' '.join([d.page_content for d in docs]) if docs else ''}\nPregunta: {question}") | get_llm() | StrOutputParser()
         for chunk in chain.stream({}): yield chunk
     except Exception as e: yield f"Error: {e}"

@@ -1,9 +1,10 @@
 import os
 import json
-import re
+import time
+import requests
 from typing import List, Dict, Any, Optional
 
-# Usamos la API REMOTA de HuggingFace (No la local)
+# LangChain y Pinecone
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
@@ -12,12 +13,13 @@ from langchain.schema import StrOutputParser
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
+# Base de datos
 from app.db.session import SessionLocal
 from app.db.models import AppSettings, TokenUsageLog
 from pinecone import Pinecone
 from app.core.config import settings
 
-# --- VARIABLES GLOBALES (LAZY LOADING) ---
+# --- VARIABLES GLOBALES ---
 _embeddings = None
 _vector_store = None
 _pc_index = None
@@ -25,6 +27,86 @@ _llm = None
 
 index_name = "autobid-index"
 
+# --- CLASE PERSONALIZADA PARA MANEJAR "COLD START" DE HUGGINGFACE ---
+class RobustHFEmbeddings(HuggingFaceInferenceAPIEmbeddings):
+    """
+    Versión mejorada que espera si el modelo se está cargando (Error 503).
+    """
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        # Intentamos hasta 5 veces (aprox 30 segundos de espera total)
+        for attempt in range(5):
+            try:
+                return super().embed_documents(texts)
+            except Exception as e:
+                # Si el error contiene "loading", esperamos
+                error_msg = str(e).lower()
+                if "loading" in error_msg or "503" in error_msg:
+                    print(f"⏳ Modelo HF cargando... Intento {attempt+1}/5. Esperando 5s...")
+                    time.sleep(5)
+                    continue
+                # Si es otro error, lo lanzamos
+                raise e
+        # Si falla después de 5 intentos, lanzamos error
+        raise RuntimeError("El modelo de HuggingFace tardó demasiado en cargar.")
+
+    def embed_query(self, text: str) -> List[float]:
+        for attempt in range(5):
+            try:
+                return super().embed_query(text)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "loading" in error_msg or "503" in error_msg:
+                    print(f"⏳ Modelo HF cargando (Query)... Esperando 5s...")
+                    time.sleep(5)
+                    continue
+                raise e
+        raise RuntimeError("El modelo de HuggingFace tardó demasiado en cargar.")
+
+# --- CARGADORES (SINGLETONS) ---
+
+def get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        if not key:
+            print("❌ CRÍTICO: FALTA EL TOKEN DE HUGGINGFACE EN RENDER")
+        
+        print("☁️ Conectando a HuggingFace API (Robust Mode)...")
+        # Usamos nuestra clase blindada
+        _embeddings = RobustHFEmbeddings(
+            api_key=key,
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+    return _embeddings
+
+def get_vector_store():
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = PineconeVectorStore(
+            index_name=index_name,
+            embedding=get_embeddings(), 
+            pinecone_api_key=settings.PINECONE_API_KEY
+        )
+    return _vector_store
+
+def get_pc_index():
+    global _pc_index
+    if _pc_index is None:
+        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        _pc_index = pc.Index(index_name)
+    return _pc_index
+
+def get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash", 
+            temperature=0.3,
+            google_api_key=settings.GOOGLE_API_KEY
+        )
+    return _llm
+
+# --- UTILS ---
 def _log_token_usage(user_id: str, model_name: str, response: Any):
     try:
         token_info = response.response_metadata.get("token_usage", {}) or response.response_metadata.get("usage_metadata", {})
@@ -38,54 +120,16 @@ def _log_token_usage(user_id: str, model_name: str, response: Any):
             ))
             db.commit()
             db.close()
-    except Exception:
-        pass
+    except: pass
 
-# --- CARGADORES ---
-
-def get_embeddings():
-    """Conecta a la API gratuita de HuggingFace (Nube)."""
-    global _embeddings
-    if _embeddings is None:
-        key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
-        if not key: print("⚠️ FALTA HUGGINGFACE TOKEN")
-        
-        print("☁️ Conectando a HuggingFace API (all-MiniLM-L6-v2)...")
-        # Usamos InferenceAPIEmbeddings -> Esto corre en los servidores de ellos
-        _embeddings = HuggingFaceInferenceAPIEmbeddings(
-            api_key=key,
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
-    return _embeddings
-
-def get_vector_store():
-    global _vector_store
-    if _vector_store is None:
-        _vector_store = PineconeVectorStore(
-            index_name=index_name, embedding=get_embeddings(), pinecone_api_key=settings.PINECONE_API_KEY
-        )
-    return _vector_store
-
-def get_pc_index():
-    global _pc_index
-    if _pc_index is None:
-        _pc_index = Pinecone(api_key=settings.PINECONE_API_KEY).Index(index_name)
-    return _pc_index
-
-def get_llm():
-    global _llm
-    if _llm is None:
-        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3, google_api_key=settings.GOOGLE_API_KEY)
-    return _llm
-
-# --- LÓGICA ---
+# --- LOGICA DE NEGOCIO ---
 
 def clear_active_tender(namespace: str):
     try: get_pc_index().delete(filter={"category": "active_tender"}, namespace=namespace)
     except: pass
 
 def ingest_text(text: str, metadata: dict, namespace: str):
-    if not text: return {"error": "Vacío"}
+    if not text: return {"error": "Texto vacío"}
     text = text.replace("\x00", "")
     
     if metadata.get("category") != "active_tender":
@@ -96,11 +140,16 @@ def ingest_text(text: str, metadata: dict, namespace: str):
 
     try:
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        docs = [Document(page_content=c, metadata=metadata) for c in splitter.split_text(text)]
+        chunks = splitter.split_text(text)
+        docs = [Document(page_content=c, metadata=metadata) for c in chunks]
+        
+        # Aquí es donde ocurría el error. Ahora RobustHFEmbeddings lo manejará.
         ids = get_vector_store().add_documents(docs, namespace=namespace)
-        return {"message": "Éxito (HF API) 🚀", "chunks_count": len(ids)}
+        
+        return {"message": "Guardado exitoso (HF API) 🚀", "chunks_count": len(ids)}
     except Exception as e:
-        print(f"Error Ingest: {e}")
+        print(f"Error CRÍTICO Ingest: {e}")
+        # IMPORTANTE: Si ves este error en los logs, nos dirá exactamente qué pasó
         raise e
 
 def delete_document_by_source(filename: str, namespace: str):
@@ -147,13 +196,15 @@ def generate_proposal_draft(namespace: str):
     vstore = get_vector_store()
     llm = get_llm()
     tender = " ".join([d.page_content for d in vstore.similarity_search("objetivos", k=6, filter={"category": "active_tender"}, namespace=namespace)])
-    q = llm.invoke(f"Query for similar cases based on: {tender[:500]}").content
+    
+    # Búsqueda inteligente
+    q = llm.invoke(f"Search query based on: {tender[:500]}").content
     company = " ".join([d.page_content for d in vstore.similarity_search(q, k=5, filter={"category": {"$ne": "active_tender"}}, namespace=namespace)])
     
     db = SessionLocal()
     st = db.query(AppSettings).filter(AppSettings.user_id == namespace).first()
     db.close()
     
-    res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal structure.")
+    res = llm.invoke(f"Role: Bid Manager at {st.company_name if st else 'Us'}. Tender: {tender}. Our Exp: {company}. Write proposal.")
     _log_token_usage(namespace, llm.model, res)
     return res.content

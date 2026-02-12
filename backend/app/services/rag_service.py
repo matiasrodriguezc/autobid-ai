@@ -1,10 +1,12 @@
 import os
 import json
 import time
-import requests
 from typing import List, Dict, Any, Optional
 
-# --- IMPORTANTE: Usamos la interfaz base limpia, sin Pydantic ---
+# USAMOS LA LIBRERÍA OFICIAL DE GOOGLE
+import google.generativeai as genai
+
+# Interfaces necesarias
 from langchain_core.embeddings import Embeddings 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
@@ -27,74 +29,78 @@ _llm = None
 
 index_name = "autobid-index"
 
-# --- CLASE MANUAL LIMPIA (Sin herencia de Pydantic) ---
-class ManualHFEmbeddings(Embeddings):
+# --- CLASE GOOGLE 001 (LEGACY) ---
+class GoogleLegacyEmbeddings(Embeddings):
     """
-    Clase totalmente manual para conectar con HuggingFace.
-    Hereda de 'Embeddings' solo para cumplir con la interfaz que pide Pinecone.
+    Usa el modelo 'models/embedding-001'.
+    Este modelo devuelve SIEMPRE vectores de 768 dimensiones.
     """
-    def __init__(self, api_key, model_name):
-        # Al no heredar de un modelo Pydantic, podemos usar __init__ normal
-        self.api_key = api_key
-        self.model_name = model_name
-        self.api_url = f"https://router.huggingface.co/hf-inference/models/{model_name}"
+    def __init__(self, api_key):
+        genai.configure(api_key=api_key)
+        self.model_name = "models/embedding-001"
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        # wait_for_model evita el error 503
-        payload = {"inputs": texts, "options": {"wait_for_model": True}}
-
-        for attempt in range(5):
-            try:
-                response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
-                
-                if response.status_code != 200:
-                    raise ValueError(f"Error {response.status_code}: {response.text}")
-
-                data = response.json()
-
-                if isinstance(data, dict) and "error" in data:
-                    raise ValueError(f"HF Error JSON: {data}")
-
-                # Verificamos que sea una lista de vectores (lista de listas)
-                if isinstance(data, list) and len(data) > 0:
-                    if isinstance(data[0], list):
-                        return data 
-                    else:
-                        raise ValueError(f"Formato inesperado: {data}")
-                
-                raise ValueError(f"Respuesta vacía o incorrecta: {data}")
-
-            except Exception as e:
-                print(f"⚠️ Intento {attempt+1}/5 fallido. Error: {e}")
-                if "401" in str(e) or "403" in str(e):
-                    print("❌ TOKEN INVALIDO.")
-                    raise e
-                
-                print("⏳ Reintentando en 3 segundos...")
-                time.sleep(3)
+        # Google permite batching. Procesamos en lotes.
+        batch_size = 20 # 001 a veces es más restrictivo con el tamaño del batch
+        all_embeddings = []
         
-        raise RuntimeError("Falló la conexión manual con HuggingFace tras 5 intentos.")
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i+batch_size]
+            try:
+                # Llamada directa al modelo 001
+                result = genai.embed_content(
+                    model=self.model_name,
+                    content=batch
+                )
+                
+                # Manejo de respuesta de la API de Google
+                if 'embedding' in result:
+                    # La API puede devolver una lista de vectores o un solo vector
+                    # Si enviamos una lista (batch), embedding debería ser una lista de listas
+                    embeddings_batch = result['embedding']
+                    
+                    # Verificación defensiva: ¿Es lista de listas?
+                    if isinstance(embeddings_batch, list) and len(embeddings_batch) > 0:
+                        if isinstance(embeddings_batch[0], list):
+                            all_embeddings.extend(embeddings_batch)
+                        else:
+                            # Caso raro: devolvió un solo vector plano (no debería pasar en batch)
+                            all_embeddings.append(embeddings_batch)
+                
+            except Exception as e:
+                print(f"❌ Error Google 001 Batch: {e}")
+                time.sleep(1) # Espera y reintenta
+                try:
+                    result = genai.embed_content(model=self.model_name, content=batch)
+                    all_embeddings.extend(result['embedding'])
+                except Exception as e2:
+                    print(f"❌ Falló reintento: {e2}")
+                    raise e2
+
+        return all_embeddings
 
     def embed_query(self, text: str) -> List[float]:
-        # Reutilizamos la lógica
-        result = self.embed_documents([text])
-        return result[0]
+        try:
+            result = genai.embed_content(
+                model=self.model_name,
+                content=text
+            )
+            return result['embedding']
+        except Exception as e:
+            print(f"❌ Error Google 001 Query: {e}")
+            raise e
 
 # --- CARGADORES (SINGLETONS) ---
 
 def get_embeddings():
     global _embeddings
     if _embeddings is None:
-        key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        key = settings.GOOGLE_API_KEY
         if not key:
-            print("❌ CRÍTICO: FALTA TOKEN HF")
+            print("❌ CRÍTICO: FALTA GOOGLE_API_KEY")
         
-        print("☁️ Conectando a HuggingFace (Modo Manual Directo)...")
-        _embeddings = ManualHFEmbeddings(
-            api_key=key,
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        print("⚡ Conectando a Google (Modelo 001 - 768 dims)...")
+        _embeddings = GoogleLegacyEmbeddings(api_key=key)
     return _embeddings
 
 def get_vector_store():
@@ -161,11 +167,11 @@ def ingest_text(text: str, metadata: dict, namespace: str):
         chunks = splitter.split_text(text)
         docs = [Document(page_content=c, metadata=metadata) for c in chunks]
         
-        print(f"📡 Enviando {len(chunks)} fragmentos a HuggingFace (Directo)...")
+        print(f"📡 Vectorizando {len(chunks)} fragmentos con Google 001...")
         
         ids = get_vector_store().add_documents(docs, namespace=namespace)
         
-        return {"message": "Guardado exitoso (HF Direct) 🚀", "chunks_count": len(ids)}
+        return {"message": "Guardado exitoso (Google 001) 🚀", "chunks_count": len(ids)}
     except Exception as e:
         print(f"❌ Error CRÍTICO Ingest: {e}")
         raise e

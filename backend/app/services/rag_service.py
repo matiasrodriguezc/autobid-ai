@@ -64,6 +64,10 @@ class _GeminiEmbeddingsNoBatch(GoogleGenerativeAIEmbeddings):
     The Gemini batchEmbedContents API can reject the model name format
     (400 unexpected model name format). Using embed_content per document
     avoids that. Slightly slower for large docs but reliable.
+
+    Must call self.client.embed_content() directly: the base embed_query
+    delegates to embed_documents, so calling embed_query from here
+    would cause infinite recursion.
     """
 
     def embed_documents(
@@ -75,17 +79,23 @@ class _GeminiEmbeddingsNoBatch(GoogleGenerativeAIEmbeddings):
         titles: Optional[List[str]] = None,
         output_dimensionality: Optional[int] = None,
     ) -> List[List[float]]:
+        from langchain_google_genai._common import GoogleGenerativeAIError
+
         task_type = task_type or self.task_type or "RETRIEVAL_DOCUMENT"
         out: List[List[float]] = []
         for i, text in enumerate(texts):
             title = titles[i] if titles and i < len(titles) else None
-            emb = self.embed_query(
-                text,
+            request = self._prepare_request(
+                text=text,
                 task_type=task_type,
                 title=title,
                 output_dimensionality=output_dimensionality,
             )
-            out.append(emb)
+            try:
+                result = self.client.embed_content(request)
+            except Exception as e:
+                raise GoogleGenerativeAIError(f"Error embedding content: {e}") from e
+            out.append(list(result.embedding.values))
         return out
 
     async def aembed_documents(
@@ -97,18 +107,20 @@ class _GeminiEmbeddingsNoBatch(GoogleGenerativeAIEmbeddings):
         titles: Optional[List[str]] = None,
         output_dimensionality: Optional[int] = None,
     ) -> List[List[float]]:
-        task_type = task_type or self.task_type or "RETRIEVAL_DOCUMENT"
-        out: List[List[float]] = []
-        for i, text in enumerate(texts):
-            title = titles[i] if titles and i < len(titles) else None
-            emb = await self.aembed_query(
-                text,
+        import asyncio
+
+        # Avoid batch API and recursion: run sync single-request path in executor
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.embed_documents(
+                texts,
+                batch_size=batch_size,
                 task_type=task_type,
-                title=title,
+                titles=titles,
                 output_dimensionality=output_dimensionality,
-            )
-            out.append(emb)
-        return out
+            ),
+        )
 
 
 # A. Embeddings (no-batch wrapper to avoid BatchEmbedContentsRequest model format errors)

@@ -41,13 +41,13 @@ export function LoginScreen() {
         router.push("/dashboard")
       } else {
         console.log(result)
-        setError("Se requiere un paso adicional.")
+        setError("An additional step is required.")
       }
     } catch (err: any) {
       console.error(err)
-      if (err.errors?.[0]?.code === "form_password_incorrect") setError("Contraseña incorrecta.")
-      else if (err.errors?.[0]?.code === "form_identifier_not_found") setError("No existe cuenta con este email.")
-      else setError("Error al iniciar sesión.")
+      if (err.errors?.[0]?.code === "form_password_incorrect") setError("Incorrect password.")
+      else if (err.errors?.[0]?.code === "form_identifier_not_found") setError("No account found with this email.")
+      else setError("Error signing in.")
     } finally {
       setIsLoading(false)
     }
@@ -72,9 +72,9 @@ export function LoginScreen() {
       
     } catch (err: any) {
       console.error(err)
-      if (err.errors?.[0]?.code === "form_identifier_exists") setError("Este email ya está registrado.")
-      else if (err.errors?.[0]?.code === "form_password_pwned") setError("Usa una contraseña más segura.")
-      else setError("Error al crear cuenta: " + err.errors?.[0]?.message)
+      if (err.errors?.[0]?.code === "form_identifier_exists") setError("This email is already registered.")
+      else if (err.errors?.[0]?.code === "form_password_pwned") setError("Use a stronger password.")
+      else setError("Error creating account: " + err.errors?.[0]?.message)
     } finally {
       setIsLoading(false)
     }
@@ -94,11 +94,11 @@ export function LoginScreen() {
         await setActiveSignUp({ session: completeSignUp.createdSessionId })
         router.push("/dashboard")
       } else {
-        setError("Código inválido o incompleto.")
+        setError("Invalid or incomplete code.")
       }
     } catch (err: any) {
       console.error(err)
-      setError("Código incorrecto.")
+      setError("Incorrect code.")
     } finally {
       setIsLoading(false)
     }
@@ -115,7 +115,7 @@ export function LoginScreen() {
         })
     } catch (err) {
         console.error(err)
-        setError("Error al conectar con Google")
+        setError("Error connecting with Google")
     }
   }
 
@@ -130,24 +130,24 @@ export function LoginScreen() {
                 <div className="mx-auto size-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                     <Mail className="size-6 text-blue-600" />
                 </div>
-                <CardTitle>Verifica tu Email</CardTitle>
-                <CardDescription>Hemos enviado un código de 6 dígitos a <b>{email}</b></CardDescription>
+                <CardTitle>Verify your Email</CardTitle>
+                <CardDescription>We've sent a 6-digit code to <b>{email}</b></CardDescription>
             </CardHeader>
             <CardContent>
                 {error && <Alert variant="destructive" className="mb-4"><AlertCircle className="size-4"/><AlertDescription>{error}</AlertDescription></Alert>}
                 <form onSubmit={handleVerify} className="space-y-4">
                     <Input 
-                        placeholder="Código (Ej: 123456)" 
+                        placeholder="Code (e.g. 123456)" 
                         value={code} 
                         onChange={(e) => setCode(e.target.value)} 
                         className="text-center text-lg tracking-widest"
                         maxLength={6}
                     />
                     <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? <Loader2 className="animate-spin" /> : "Verificar Cuenta"}
+                        {isLoading ? <Loader2 className="animate-spin" /> : "Verify Account"}
                     </Button>
                     <Button variant="ghost" className="w-full" onClick={() => setView("signup")} type="button">
-                        Volver atrás
+                        Go back
                     </Button>
                 </form>
             </CardContent>
@@ -168,12 +168,12 @@ export function LoginScreen() {
             <h1 className="text-2xl font-bold text-foreground">AutoBid AI</h1>
           </div>
           <CardTitle className="text-xl">
-            {view === "login" ? "Bienvenido de nuevo" : "Crea tu cuenta"}
+            {view === "login" ? "Welcome back" : "Create your account"}
           </CardTitle>
           <CardDescription>
             {view === "login" 
-                ? "Ingresa para gestionar tus licitaciones" 
-                : "Empieza a ganar contratos con IA hoy mismo"}
+                ? "Sign in to manage your bids" 
+                : "Start winning contracts with AI today"}
           </CardDescription>
         </CardHeader>
         
@@ -190,17 +190,17 @@ export function LoginScreen() {
             {/* Campo Nombre (Solo en Sign Up) */}
             {view === "signup" && (
                 <div className="space-y-2">
-                    <Label htmlFor="name">Nombre</Label>
-                    <Input id="name" placeholder="Tu nombre" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                    <Label htmlFor="name">Name</Label>
+                    <Input id="name" placeholder="Your name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
                 </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Corporativo</Label>
-              <Input id="email" type="email" placeholder="nombre@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="email">Work Email</Label>
+              <Input id="email" type="email" placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             </div>
             
@@ -208,14 +208,14 @@ export function LoginScreen() {
               {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                  view === "login" ? "Iniciar Sesión" : "Crear Cuenta"
+                  view === "login" ? "Sign In" : "Create Account"
               )}
             </Button>
           </form>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">O continúa con</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or continue with</span></div>
           </div>
 
           <Button variant="outline" className="w-full border-border bg-transparent" onClick={handleGoogleLogin} type="button">
@@ -231,16 +231,16 @@ export function LoginScreen() {
           <div className="text-center text-sm">
             {view === "login" ? (
                 <p className="text-muted-foreground">
-                    ¿No tienes cuenta?{" "}
+                    Don't have an account?{" "}
                     <button onClick={() => setView("signup")} className="text-primary hover:underline font-medium">
-                        Regístrate gratis
+                        Sign up free
                     </button>
                 </p>
             ) : (
                 <p className="text-muted-foreground">
-                    ¿Ya tienes cuenta?{" "}
+                    Already have an account?{" "}
                     <button onClick={() => setView("login")} className="text-primary hover:underline font-medium">
-                        Inicia sesión
+                        Sign in
                     </button>
                 </p>
             )}

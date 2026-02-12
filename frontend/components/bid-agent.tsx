@@ -35,7 +35,7 @@ export function BidAgent() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { 
       role: "bot", 
-      text: "¡Hola! Soy tu Agente de Licitaciones. Tengo cargado el contexto del último pliego que subiste. ¿Qué necesitas analizar?", 
+      text: "Hi! I'm your Bid Agent. I have the context of the last tender you uploaded. What would you like to analyze?", 
       timestamp: new Date() 
     }
   ])
@@ -78,7 +78,7 @@ export function BidAgent() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-        toast({ title: "No soportado", description: "Tu navegador no soporta reconocimiento de voz.", variant: "destructive" })
+        toast({ title: "Not supported", description: "Your browser does not support voice recognition.", variant: "destructive" })
         return
     }
 
@@ -89,7 +89,7 @@ export function BidAgent() {
       setInput("")
       recognitionRef.current.start()
       setIsListening(true)
-      toast({ description: "🎙️ Escuchando..." })
+      toast({ description: "🎙️ Listening..." })
     }
   }
 
@@ -157,7 +157,7 @@ export function BidAgent() {
       })
 
       if (!response.ok) throw new Error("Error")
-      if (!response.body) throw new Error("Sin body")
+      if (!response.body) throw new Error("No response body")
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -182,7 +182,7 @@ export function BidAgent() {
       }
 
     } catch (error) {
-      toast({ title: "Error", description: "Se cortó la conexión.", variant: "destructive" })
+      toast({ title: "Error", description: "Connection was interrupted.", variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -190,7 +190,7 @@ export function BidAgent() {
 
   const handleClearChat = () => {
       setMessages([messages[0]]) 
-      toast({ description: "Historial limpiado." })
+      toast({ description: "Chat cleared." })
   }
 
   return (
@@ -203,7 +203,7 @@ export function BidAgent() {
         onNavigateToEditor={() => {
             setMessages([{ 
                 role: "bot", 
-                text: "He leído el nuevo documento. ¿En qué puedo ayudarte?", 
+                text: "I've read the new document. How can I help you?", 
                 timestamp: new Date() 
             }])
         }}
@@ -217,7 +217,7 @@ export function BidAgent() {
             Bid Agent
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Chatea con el pliego activo.
+            Chat with the active tender.
           </p>
         </div>
         
@@ -225,12 +225,12 @@ export function BidAgent() {
         <div className="flex gap-2 w-full md:w-auto">
             <Button variant="outline" onClick={handleClearChat} className="flex-1 md:flex-none gap-2">
               <Trash2 className="size-4 text-muted-foreground" /> 
-              <span className="hidden sm:inline">Limpiar</span>
+              <span className="hidden sm:inline">Clear</span>
             </Button>
             <Button onClick={() => setShowUploadDialog(true)} className="flex-1 md:flex-none bg-primary text-primary-foreground">
                 <Upload className="mr-2 size-4" /> 
-                <span className="hidden sm:inline">Cambiar Tender</span>
-                <span className="sm:hidden">Subir PDF</span>
+                <span className="hidden sm:inline">Change Tender</span>
+                <span className="sm:hidden">Upload PDF</span>
             </Button>
         </div>
       </div>
@@ -265,7 +265,7 @@ export function BidAgent() {
                         {msg.role === 'bot' && msg.text === "" ? (
                            <div className="flex items-center gap-2 text-muted-foreground italic">
                                 <Loader2 className="size-3 animate-spin"/>
-                                <span>Pensando...</span>
+                                <span>Thinking...</span>
                            </div>
                         ) : (
                            msg.text
@@ -284,7 +284,7 @@ export function BidAgent() {
                                 size="icon" 
                                 className="h-6 w-6" 
                                 onClick={() => handleSpeak(msg.text, i)}
-                                title="Leer"
+                                title="Read aloud"
                             >
                                 {speakingMsgIndex === i ? (
                                     <Square className="size-3 text-red-500 fill-current" />
@@ -298,7 +298,7 @@ export function BidAgent() {
                                 size="icon" 
                                 className="h-6 w-6" 
                                 onClick={() => handleCopy(msg.text, i)}
-                                title="Copiar"
+                                title="Copy"
                             >
                                 {copiedIndex === i ? (
                                     <Check className="size-3 text-green-500" />
@@ -341,7 +341,7 @@ export function BidAgent() {
                     value={input} 
                     onChange={e => setInput(e.target.value)} 
                     // Placeholder más corto para móvil
-                    placeholder={isListening ? "Escuchando..." : "Escribe tu duda..."}
+                    placeholder={isListening ? "Listening..." : "Ask a question..."}
                     className={`pl-10 h-12 text-base shadow-sm focus-visible:ring-primary/20 transition-all ${
                         isListening ? "border-red-500 ring-1 ring-red-500 bg-red-50 dark:bg-red-950/20" : "border-muted-foreground/20"
                     }`}

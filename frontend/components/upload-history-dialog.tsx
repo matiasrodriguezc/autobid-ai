@@ -52,10 +52,10 @@ export function UploadHistoryDialog({ open, onOpenChange, onUploadComplete }: Up
       if (!res.ok) throw new Error("Upload failed")
 
       toast({
-        title: "✅ Historial Guardado",
+        title: "✅ History Saved",
         description: status !== "PENDING" 
-          ? "El modelo de IA ha sido re-entrenado con este caso." 
-          : "Guardado en historial como pendiente.",
+          ? "The AI model has been retrained with this case." 
+          : "Saved to history as pending.",
         className: "bg-green-600 text-white border-none"
       })
       
@@ -68,7 +68,7 @@ export function UploadHistoryDialog({ open, onOpenChange, onUploadComplete }: Up
       console.error(error)
       toast({ 
         title: "Error", 
-        description: "No se pudo subir el archivo. Verifica tu conexión.", 
+        description: "Could not upload file. Check your connection.", 
         variant: "destructive" 
       })
     } finally {
@@ -80,9 +80,9 @@ export function UploadHistoryDialog({ open, onOpenChange, onUploadComplete }: Up
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Subir Licitación Pasada</DialogTitle>
+          <DialogTitle>Upload Past Bid</DialogTitle>
           <DialogDescription>
-            Sube un PDF antiguo y define su resultado para entrenar a la IA.
+            Upload an old PDF and set its outcome to train the AI.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,19 +90,19 @@ export function UploadHistoryDialog({ open, onOpenChange, onUploadComplete }: Up
           
           {/* 1. Selector de Archivo */}
           <div className="flex flex-col gap-3">
-            <Label>Documento de la Propuesta (PDF)</Label>
+            <Label>Proposal Document (PDF)</Label>
             <div className="flex items-center justify-center w-full">
                 <label htmlFor="history-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 border-border hover:border-primary/50 transition-all">
                     {file ? (
                         <div className="flex flex-col items-center">
                             <FileText className="size-8 text-primary mb-2" />
                             <p className="text-sm font-medium text-foreground">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">Clic para cambiar</p>
+                            <p className="text-xs text-muted-foreground">Click to change</p>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center">
                             <Upload className="size-8 text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">Click o arrastra aquí</p>
+                            <p className="text-sm text-muted-foreground">Click or drag here</p>
                         </div>
                     )}
                     <Input id="history-file" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
@@ -112,41 +112,41 @@ export function UploadHistoryDialog({ open, onOpenChange, onUploadComplete }: Up
 
           {/* 2. Selector de Estado */}
           <div className="flex flex-col gap-3">
-            <Label>Resultado del Proyecto</Label>
+            <Label>Project Outcome</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona el resultado" />
+                <SelectValue placeholder="Select outcome" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="WON">
                     <div className="flex items-center text-green-500">
-                        <Trophy className="size-4 mr-2" /> Ganada (Entrenar Éxito)
+                        <Trophy className="size-4 mr-2" /> Won (Train Success)
                     </div>
                 </SelectItem>
                 <SelectItem value="LOST">
                     <div className="flex items-center text-red-500">
-                        <XCircle className="size-4 mr-2" /> Perdida (Entrenar Fallo)
+                        <XCircle className="size-4 mr-2" /> Lost (Train Failure)
                     </div>
                 </SelectItem>
                 <SelectItem value="PENDING">
                     <div className="flex items-center text-yellow-500">
-                        <Clock className="size-4 mr-2" /> Pendiente (Sin Entrenar)
+                        <Clock className="size-4 mr-2" /> Pending (No Training)
                     </div>
                 </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-[10px] text-muted-foreground">
-                * Solo los casos Ganados o Perdidos modifican el algoritmo de predicción.
+                * Only Won or Lost outcomes update the prediction algorithm.
             </p>
           </div>
 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleUpload} disabled={!file || isUploading} className="bg-primary text-primary-foreground">
             {isUploading ? <Loader2 className="animate-spin mr-2 size-4" /> : <Upload className="mr-2 size-4" />}
-            {isUploading ? "Procesando..." : "Subir y Entrenar"}
+            {isUploading ? "Processing..." : "Upload & Train"}
           </Button>
         </DialogFooter>
       </DialogContent>

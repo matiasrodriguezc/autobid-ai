@@ -87,12 +87,12 @@ export function KnowledgeBase() {
             body: JSON.stringify({ updates })
         })
 
-        if (!res.ok) throw new Error("Error en bulk update")
+        if (!res.ok) throw new Error("Bulk update error")
 
         const data = await res.json()
         
         toast({
-            title: "✅ Cambios Guardados",
+            title: "✅ Changes Saved",
             description: data.message,
             className: "bg-green-600 text-white border-none"
         })
@@ -102,7 +102,7 @@ export function KnowledgeBase() {
 
     } catch (error) {
         console.error(error)
-        toast({ title: "Error", description: "No se pudieron guardar los cambios.", variant: "destructive" })
+        toast({ title: "Error", description: "Could not save changes.", variant: "destructive" })
         fetchDocuments() 
     } finally {
         setIsSavingBulk(false)
@@ -112,7 +112,7 @@ export function KnowledgeBase() {
   const handleCancelChanges = () => {
       setPendingChanges({})
       fetchDocuments() 
-      toast({ description: "Cambios descartados." })
+      toast({ description: "Changes discarded." })
   }
 
   const handleSelectAll = (checked: boolean) => {
@@ -146,7 +146,7 @@ export function KnowledgeBase() {
 
         setDocuments(prev => prev.filter(doc => !idsToDelete.includes(doc.id)))
         setSelectedIds(prev => prev.filter(id => !idsToDelete.includes(id)))
-        toast({ title: "🗑️ Eliminado", description: `Se eliminaron ${idsToDelete.length} archivos.` })
+        toast({ title: "🗑️ Deleted", description: `${idsToDelete.length} file(s) removed.` })
 
     } catch (error) {
         toast({ title: "Error", variant: "destructive" })
@@ -172,7 +172,7 @@ export function KnowledgeBase() {
       if (!response.ok) throw new Error("Error")
       const data = await response.json()
       fetchDocuments()
-      toast({ title: "✅ Procesado", description: `Categoría detectada: ${data.detected_category}`, className: "bg-green-600 text-white border-none" })
+      toast({ title: "✅ Processed", description: `Category detected: ${data.detected_category}`, className: "bg-green-600 text-white border-none" })
     } catch (error) {
       toast({ title: "Error", variant: "destructive" })
     } finally {
@@ -224,17 +224,17 @@ export function KnowledgeBase() {
             <AlertDialogTitle className="text-destructive flex items-center gap-2">
                 <AlertTriangle className="size-5"/>
                 {idsToDelete.length > 1 
-                  ? `¿Borrar ${idsToDelete.length} documentos?` 
-                  : "¿Borrar este documento?"}
+                  ? `Delete ${idsToDelete.length} documents?` 
+                  : "Delete this document?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminarán de la base de datos y la IA olvidará su contenido.
+              They will be removed from the database and the AI will forget their content.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-               {idsToDelete.length > 1 ? "Sí, Eliminar Todo" : "Sí, Eliminar"}
+               {idsToDelete.length > 1 ? "Yes, Delete All" : "Yes, Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -242,8 +242,8 @@ export function KnowledgeBase() {
 
       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Base de Conocimiento</h1>
-            <p className="text-muted-foreground mt-1">Gestiona los documentos del cerebro de tu empresa.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Knowledge Base</h1>
+            <p className="text-muted-foreground mt-1">Manage your company's knowledge documents.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-top-2 w-full md:w-auto">
@@ -255,7 +255,7 @@ export function KnowledgeBase() {
                         onClick={handleCancelChanges} 
                         className="flex-1 md:flex-none text-muted-foreground hover:text-foreground hover:bg-muted"
                     >
-                        <X className="mr-2 size-4" /> Cancelar
+                        <X className="mr-2 size-4" /> Cancel
                     </Button>
                     <Button 
                         onClick={handleSaveAllChanges} 
@@ -284,12 +284,12 @@ export function KnowledgeBase() {
       <Card onClick={() => !isUploading && fileInputRef.current?.click()} className="border-2 border-dashed border-border bg-card hover:border-primary/50 transition-colors cursor-pointer group">
         <CardContent className="flex flex-col items-center justify-center py-12 px-4">
           {isUploading ? (
-            <div className="flex flex-col items-center animate-pulse"><Loader2 className="size-12 text-primary animate-spin mb-4" /><p className="text-sm text-muted-foreground">Procesando...</p></div>
+            <div className="flex flex-col items-center animate-pulse"><Loader2 className="size-12 text-primary animate-spin mb-4" /><p className="text-sm text-muted-foreground">Processing...</p></div>
           ) : (
             <>
               <div className="size-14 bg-primary/10 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><Sparkles className="size-7 text-primary" /></div>
-              <h3 className="text-lg font-semibold text-card-foreground mb-1">Subir Nuevo PDF</h3>
-              <p className="text-muted-foreground text-center text-sm">Arrastra o haz clic. Auto-clasificación activa.</p>
+              <h3 className="text-lg font-semibold text-card-foreground mb-1">Upload New PDF</h3>
+              <p className="text-muted-foreground text-center text-sm">Drag and drop or click. Auto-classification enabled.</p>
               <input type="file" accept=".pdf" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileChange}/>
             </>
           )}
@@ -298,15 +298,15 @@ export function KnowledgeBase() {
 
       <Card className="border-border bg-card">
         <CardHeader className="flex flex-row items-center justify-between py-4">
-          <div><CardTitle className="text-lg">Archivos Indexados</CardTitle></div>
+          <div><CardTitle className="text-lg">Indexed Files</CardTitle></div>
           <div className="flex items-center gap-2">
-               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:inline">Seleccionar Todo</span>
+               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:inline">Select All</span>
                <Checkbox checked={documents.length > 0 && selectedIds.length === documents.length} onCheckedChange={(c) => handleSelectAll(c as boolean)} />
           </div>
         </CardHeader>
         <CardContent className="p-4">
           <div className="space-y-3">
-            {isLoadingData ? <div className="text-center py-8 text-muted-foreground">Cargando...</div> : documents.length === 0 ? <div className="text-center py-8 text-muted-foreground">Vacío.</div> : (
+            {isLoadingData ? <div className="text-center py-8 text-muted-foreground">Loading...</div> : documents.length === 0 ? <div className="text-center py-8 text-muted-foreground">Empty.</div> : (
                 documents.map((doc) => {
                     const isModified = pendingChanges[doc.id] !== undefined
                     
@@ -349,10 +349,10 @@ export function KnowledgeBase() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="CV">CV / Perfil</SelectItem>
-                                        <SelectItem value="Case Study">Caso de Éxito</SelectItem>
-                                        <SelectItem value="Financial">Financiero</SelectItem>
-                                        <SelectItem value="Technical">Técnico</SelectItem>
+                                        <SelectItem value="CV">CV / Profile</SelectItem>
+                                        <SelectItem value="Case Study">Case Study</SelectItem>
+                                        <SelectItem value="Financial">Financial</SelectItem>
+                                        <SelectItem value="Technical">Technical</SelectItem>
                                         <SelectItem value="General">General</SelectItem>
                                     </SelectContent>
                                 </Select>

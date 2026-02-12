@@ -56,8 +56,8 @@ export default function BidWorkstation() {
         }
         if (savedDraft.length > 10) {
             toast({ 
-                title: "Borrador Recuperado", 
-                description: "Hemos restaurado tu trabajo anterior.",
+                title: "Draft Recovered", 
+                description: "Your previous work has been restored.",
                 duration: 3000
             })
         }
@@ -102,14 +102,14 @@ export default function BidWorkstation() {
       
       const data = await response.json()
       setProposalText(data.draft_text)
-      setFinalizeData(prev => ({...prev, title: "Propuesta Generada por IA", budget: 0}))
+      setFinalizeData(prev => ({...prev, title: "AI-Generated Proposal", budget: 0}))
 
     } catch (error: any) {
       if (error.name === 'AbortError') {
          console.log('🛑 Generación cancelada por el usuario')
       } else {
          console.error("Error:", error)
-         setProposalText("Error conectando con el servidor.")
+         setProposalText("Error connecting to server.")
       }
     } finally {
       setIsGenerating(false)
@@ -120,7 +120,7 @@ export default function BidWorkstation() {
   const handleCancelGeneration = () => {
     if (abortControllerRef.current) {
         abortControllerRef.current.abort()
-        toast({ title: "Cancelado", description: "Generación detenida.", variant: "destructive" })
+        toast({ title: "Cancelled", description: "Generation stopped.", variant: "destructive" })
     }
   }
 
@@ -165,7 +165,7 @@ export default function BidWorkstation() {
                 "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
-                title: finalizeData.title || "Propuesta Sin Título", 
+                title: finalizeData.title || "Untitled Proposal", 
                 content: proposalText,
                 industry: finalizeData.industry, 
                 budget: finalizeData.budget 
@@ -179,8 +179,8 @@ export default function BidWorkstation() {
         setProposalText("") 
 
         toast({ 
-            title: "✅ Guardada", 
-            description: "Redirigiendo...",
+            title: "✅ Saved", 
+            description: "Redirecting...",
             className: "bg-green-600 text-white border-none"
         })
 
@@ -188,7 +188,7 @@ export default function BidWorkstation() {
         router.push(`/dashboard/history?highlight=${data.id}`)
 
     } catch (e) {
-        toast({ title: "Error", description: "No se pudo finalizar.", variant: "destructive" })
+        toast({ title: "Error", description: "Could not save.", variant: "destructive" })
     } finally {
         setIsSaving(false)
     }
@@ -227,20 +227,20 @@ export default function BidWorkstation() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="size-5" />
-                Atención: Sobrescribir Borrador
+                Warning: Overwrite Draft
             </DialogTitle>
             <DialogDescription className="pt-2">
-              Ya tienes una propuesta escrita. Si generas una nueva versión con la IA, <strong>perderás el contenido actual</strong> permanentemente.
+              You already have a proposal written. If you generate a new version with AI, you will <strong>permanently lose the current content</strong>.
               <br/><br/>
-              ¿Deseas continuar de todas formas?
+              Do you want to continue anyway?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:justify-end sm:gap-4">
             <Button variant="outline" onClick={() => setShowOverwriteDialog(false)}>
-                Cancelar
+                Cancel
             </Button>
             <Button variant="destructive" onClick={executeGeneration}>
-                Sí, Sobrescribir
+                Yes, Overwrite
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -250,15 +250,15 @@ export default function BidWorkstation() {
       <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
         <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>
-            <DialogTitle>Finalizar y Guardar</DialogTitle>
+            <DialogTitle>Finalize and Save</DialogTitle>
             <DialogDescription>
-              Se guardará como <strong>PENDING</strong> en el historial.
+              It will be saved as <strong>PENDING</strong> in history.
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Nombre del Proyecto</Label>
+              <Label htmlFor="title">Project Name</Label>
               <Input 
                 id="title" 
                 value={finalizeData.title} 
@@ -267,7 +267,7 @@ export default function BidWorkstation() {
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                    <Label htmlFor="budget">Presupuesto ($)</Label>
+                    <Label htmlFor="budget">Budget ($)</Label>
                     <Input 
                         id="budget" 
                         type="number"
@@ -283,7 +283,7 @@ export default function BidWorkstation() {
                     />
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="industry">Industria</Label>
+                    <Label htmlFor="industry">Industry</Label>
                     <Input 
                         id="industry" 
                         value={finalizeData.industry} 
@@ -294,10 +294,10 @@ export default function BidWorkstation() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowFinalizeDialog(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setShowFinalizeDialog(false)}>Cancel</Button>
             <Button onClick={confirmFinalize} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white">
               {isSaving ? <Loader2 className="animate-spin size-4 mr-2"/> : <Save className="size-4 mr-2"/>}
-              Guardar
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -307,10 +307,10 @@ export default function BidWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FileText className="size-6 text-primary shrink-0" />
-          <span className="truncate">Editor de Propuesta</span>
+          <span className="truncate">Proposal Editor</span>
           {proposalText && (
              <span className="text-xs font-normal text-muted-foreground flex items-center gap-1 bg-muted px-2 py-1 rounded-full whitespace-nowrap">
-                <FileClock className="size-3"/> <span className="hidden sm:inline">Guardado</span>
+                <FileClock className="size-3"/> <span className="hidden sm:inline">Saved</span>
              </span>
           )}
         </h1>
@@ -320,19 +320,19 @@ export default function BidWorkstation() {
             {proposalText && (
                 <Button variant="outline" onClick={() => setShowUploadDialog(true)} className="flex-1 md:flex-none">
                     <Upload className="mr-2 size-4" />
-                    <span className="hidden sm:inline">Nuevo</span>
-                    <span className="sm:hidden">Nuevo</span>
+                    <span className="hidden sm:inline">New</span>
+                    <span className="sm:hidden">New</span>
                 </Button>
             )}
 
             {isGenerating ? (
                 <Button variant="destructive" onClick={handleCancelGeneration} className="animate-pulse flex-1 md:flex-none">
-                    <XCircle className="mr-2 size-4" /> Cancelar
+                    <XCircle className="mr-2 size-4" /> Cancel
                 </Button>
             ) : (
                 <Button variant="outline" onClick={handleGenerateClick} disabled={!proposalText} className="flex-1 md:flex-none">
                     <RefreshCw className="mr-2 size-4" /> 
-                    <span className="hidden sm:inline">Regenerar</span>
+                    <span className="hidden sm:inline">Regenerate</span>
                     <span className="sm:hidden">Regen.</span>
                 </Button>
             )}
@@ -344,8 +344,8 @@ export default function BidWorkstation() {
                 className="bg-purple-600 hover:bg-purple-700 text-white flex-1 md:flex-none"
             >
                 {isLearning ? <Loader2 className="animate-spin size-4 mr-2"/> : <Sparkles className="size-4 mr-2"/>} 
-                <span className="hidden sm:inline">Aprender</span>
-                <span className="sm:hidden">Train</span>
+                <span className="hidden sm:inline">Learn</span>
+                <span className="sm:hidden">Learn</span>
             </Button>
 
             <Button onClick={handleOpenFinalize} className="bg-green-600 hover:bg-green-700 text-white flex-1 md:flex-none" disabled={!proposalText}>
@@ -376,9 +376,9 @@ export default function BidWorkstation() {
                              </div>
                         </div>
                         <div className="text-center space-y-2">
-                            <p className="text-xl font-semibold">Redactando Propuesta...</p>
-                            <p className="text-muted-foreground">Consultando historial y credenciales</p>
-                            <p className="text-xs text-muted-foreground mt-4 opacity-70">¿Tarda demasiado? Pulsa "Cancelar" arriba.</p>
+                            <p className="text-xl font-semibold">Drafting proposal...</p>
+                            <p className="text-muted-foreground">Checking history and credentials</p>
+                            <p className="text-xs text-muted-foreground mt-4 opacity-70">Taking too long? Click "Cancel" above.</p>
                         </div>
                     </div>
                 </div>
@@ -397,8 +397,8 @@ export default function BidWorkstation() {
                         <div className="bg-primary/5 p-8 rounded-full mb-6 border border-primary/10">
                             <FileText className="size-16 text-primary/40" />
                         </div>
-                        <h2 className="text-2xl font-bold text-foreground mb-3">No hay propuesta activa</h2>
-                        <p className="text-muted-foreground max-w-md mb-8 text-lg">Para comenzar, sube el PDF de una licitación.</p>
+                        <h2 className="text-2xl font-bold text-foreground mb-3">No active proposal</h2>
+                        <p className="text-muted-foreground max-w-md mb-8 text-lg">To get started, upload the PDF of a tender.</p>
                         <Button 
                             size="lg" 
                             onClick={() => setShowUploadDialog(true)}

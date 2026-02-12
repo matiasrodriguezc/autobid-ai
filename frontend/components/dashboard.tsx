@@ -87,7 +87,7 @@ export default function Dashboard() {
     )
   }
 
-  if (!data) return <div className="p-8 text-center text-muted-foreground">No se pudieron cargar los datos.</div>
+  if (!data) return <div className="p-8 text-center text-muted-foreground">Could not load data.</div>
 
   return (
     <div className="p-8 space-y-8 bg-background/50 relative">
@@ -100,7 +100,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                    Hola, {user?.firstName || "Bid Manager"}
+                    Hello, {user?.firstName || "Bid Manager"}
                 </h1>
                 <p className="text-muted-foreground mt-1">Monitor your pipeline and bid performance</p>
             </div>
@@ -195,7 +195,7 @@ export default function Dashboard() {
                             </ResponsiveContainer>
                         ) : (
                             <div className="flex h-full items-center justify-center text-muted-foreground bg-muted/20 rounded border border-dashed">
-                                Sin datos suficientes
+                                Insufficient data
                             </div>
                         )}
                     </div>

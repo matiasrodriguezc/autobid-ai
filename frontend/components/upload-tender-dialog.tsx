@@ -67,7 +67,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
         body: formData,
       })
 
-      if (!response.ok) throw new Error("Error en la subida")
+      if (!response.ok) throw new Error("Upload error")
 
       const data = await response.json()
       
@@ -117,7 +117,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
         <DialogHeader>
           <DialogTitle>Analyze New Tender</DialogTitle>
           <DialogDescription>
-            Sube el PDF. La IA extraerá los datos clave y explicará tu probabilidad de éxito.
+            Upload the PDF. The AI will extract key data and explain your win probability.
           </DialogDescription>
         </DialogHeader>
 
@@ -149,7 +149,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
                             {file.name}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            {(file.size / 1024 / 1024).toFixed(2)} MB • Clic para cambiar
+                            {(file.size / 1024 / 1024).toFixed(2)} MB • Click to change
                         </p>
                     </div>
                   ) : (
@@ -158,7 +158,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
                             <Upload className="size-6 text-primary" />
                         </div>
                         <span className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
-                            Seleccionar PDF
+                            Select PDF
                         </span>
                         <p className="text-xs text-muted-foreground mt-3">PDF files only (max 10MB)</p>
                     </div>
@@ -170,17 +170,17 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
               {isUploading && (
                 <div className="flex flex-col items-center">
                   <Loader2 className="size-10 text-primary animate-spin mb-2" />
-                  <p className="text-sm font-medium">Analizando documento...</p>
-                  <p className="text-xs text-muted-foreground mt-1">Calculando predicción de éxito...</p>
+                  <p className="text-sm font-medium">Analyzing document...</p>
+                  <p className="text-xs text-muted-foreground mt-1">Calculating win prediction...</p>
                 </div>
               )}
 
               {uploadStatus === "error" && (
                 <div className="flex flex-col items-center mt-4">
                     <div className="flex items-center text-destructive font-bold gap-2 mb-2">
-                        <AlertCircle className="size-5"/> Error al procesar
+                        <AlertCircle className="size-5"/> Processing error
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setUploadStatus("idle")}>Intentar de nuevo</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setUploadStatus("idle")}>Try again</Button>
                 </div>
               )}
             </div>
@@ -191,7 +191,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
             <div className="space-y-4 animate-in fade-in zoom-in duration-300">
               <div className="flex flex-col items-center justify-center p-3 bg-green-100 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                 <CheckCircle className="size-6 text-green-600 dark:text-green-400 mb-1" />
-                <h3 className="text-md font-bold text-green-700 dark:text-green-300">¡Análisis Completado!</h3>
+                <h3 className="text-md font-bold text-green-700 dark:text-green-300">Analysis complete!</h3>
               </div>
 
               <div className="col-span-2 bg-card border border-border rounded-lg p-4 shadow-sm">
@@ -213,7 +213,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
                   {/* --- SECCIÓN SHAP VISUAL (CORREGIDA Y MEJORADA) --- */}
                   {analysis.explanation && analysis.explanation.length > 0 && (
                       <div className="mt-4 pt-3 border-t border-border">
-                          <p className="text-xs font-semibold text-muted-foreground mb-2">FACTORES DE DECISIÓN ({analysis.explanation.length})</p>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">DECISION FACTORS ({analysis.explanation.length})</p>
                           {/* Contenedor con Scroll por si hay muchos atributos */}
                           <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2">
                               {/* Mapeo completo SIN .slice() */}
@@ -232,7 +232,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
                                               />
                                           </div>
                                           <span className={`text-xs font-bold w-16 text-right ${factor.direction === "Positivo" ? "text-green-600" : "text-red-600"}`}>
-                                              {factor.direction === "Positivo" ? "+" : "-"} Impacto
+                                              {factor.direction === "Positivo" ? "+" : "-"} Impact
                                           </span>
                                       </div>
                                   </div>
@@ -245,14 +245,14 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/30 border border-border rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1 text-muted-foreground">
-                    <DollarSign className="size-3"/> <span className="text-xs font-medium">Presupuesto</span>
+                    <DollarSign className="size-3"/> <span className="text-xs font-medium">Budget</span>
                   </div>
                   <p className="text-sm font-semibold">${analysis.detected_budget.toLocaleString()}</p>
                 </div>
                 
                 <div className="bg-muted/30 border border-border rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1 text-muted-foreground">
-                    <Briefcase className="size-3"/> <span className="text-xs font-medium">Industria</span>
+                    <Briefcase className="size-3"/> <span className="text-xs font-medium">Industry</span>
                   </div>
                   <p className="text-sm font-semibold truncate" title={analysis.detected_industry}>{analysis.detected_industry}</p>
                 </div>
@@ -262,7 +262,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
         </div>
 
         <div className="flex justify-between gap-2 pt-4 border-t border-border">
-          <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
+          <Button variant="ghost" onClick={handleClose}>Cancel</Button>
           
           {uploadStatus === "success" ? (
             <div className="flex gap-2">
@@ -276,7 +276,7 @@ export function UploadTenderDialog({ open, onOpenChange, onNavigateToEditor }: U
             </div>
           ) : (
             <Button onClick={handleUpload} disabled={!file || isUploading}>
-                {isUploading ? "Analizando..." : "Analizar"}
+                {isUploading ? "Analyzing..." : "Analyze"}
             </Button>
           )}
         </div>

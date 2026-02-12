@@ -108,27 +108,27 @@ export function BidHistory() {
         }
       })
 
-      if (!res.ok) throw new Error("Error contactando al servidor")
+      if (!res.ok) throw new Error("Error contacting server")
       
       const data = await res.json()
       
       if (data.status === "trained") {
         toast({
-             title: "🧠 Modelo Actualizado",
-             description: `Entrenado con ${data.total_samples} ejemplos.`,
+             title: "🧠 Model Updated",
+             description: `Trained with ${data.total_samples} samples.`,
              className: "bg-green-600 text-white border-none"
         })
       } else if (data.status === "skipped") {
         toast({
-            description: "ℹ️ No hay suficientes datos nuevos para entrenar (< 5).",
+            description: "ℹ️ Not enough new data to train (< 5).",
         })
       } else {
-        toast({ title: "Error", description: "Error en el entrenamiento.", variant: "destructive" })
+        toast({ title: "Error", description: "Training error.", variant: "destructive" })
       }
 
     } catch (error) {
       console.error(error)
-      toast({ title: "Error", description: "Fallo al conectar con el servidor.", variant: "destructive" })
+      toast({ title: "Error", description: "Failed to connect to server.", variant: "destructive" })
     } finally {
       setIsRetraining(false)
     }
@@ -145,7 +145,7 @@ export function BidHistory() {
   const handleCancelChanges = () => {
       setPendingChanges({}) 
       fetchBids() 
-      toast({ description: "Cambios descartados." })
+      toast({ description: "Changes discarded." })
   }
 
   const handleSaveAllChanges = async () => {
@@ -166,18 +166,18 @@ export function BidHistory() {
             body: JSON.stringify({ updates })
         })
 
-        if (!res.ok) throw new Error("Error en bulk update")
+        if (!res.ok) throw new Error("Bulk update error")
         const data = await res.json()
 
         toast({
-            title: "✅ Cambios Guardados",
+            title: "✅ Changes Saved",
             description: data.message,
             className: "bg-green-600 text-white border-none"
         })
         setPendingChanges({}) 
         // Opcional: Podríamos re-fetch para asegurar sincronización
     } catch (error) {
-        toast({ title: "Error", description: "No se pudieron guardar los cambios.", variant: "destructive" })
+        toast({ title: "Error", description: "Could not save changes.", variant: "destructive" })
         fetchBids()
     } finally {
         setIsSavingBulk(false)
@@ -208,7 +208,7 @@ export function BidHistory() {
         if (!res.ok) throw new Error("Error")
         setBids(prev => prev.filter(b => !idsToDelete.includes(b.id)))
         setSelectedIds(prev => prev.filter(id => !idsToDelete.includes(id)))
-        toast({ title: "🗑️ Eliminado", description: `Se eliminaron ${idsToDelete.length} registros.` })
+        toast({ title: "🗑️ Deleted", description: `${idsToDelete.length} record(s) removed.` })
     } catch (error) { toast({ title: "Error", variant: "destructive" }) } finally { setDeleteDialogOpen(false); setIdsToDelete([]) }
   }
   
@@ -228,11 +228,11 @@ export function BidHistory() {
         if (!res.ok) throw new Error("Error")
         setBids(prev => prev.map(b => b.id === editingBid.id ? editingBid : b))
         setEditingBid(null)
-        toast({ title: "Cambios Guardados", className: "bg-green-600 text-white border-none" })
+        toast({ title: "Changes Saved", className: "bg-green-600 text-white border-none" })
     } catch (error) { toast({ title: "Error", variant: "destructive" }) } finally { setIsSaving(false) }
   }
   
-  const handleCopyContent = () => { if (viewingBid?.content_text) { navigator.clipboard.writeText(viewingBid.content_text); setCopied(true); setTimeout(() => setCopied(false), 2000); toast({ description: "Copiado" }) } }
+  const handleCopyContent = () => { if (viewingBid?.content_text) { navigator.clipboard.writeText(viewingBid.content_text); setCopied(true); setTimeout(() => setCopied(false), 2000); toast({ description: "Copied" }) } }
   const getStatusColor = (status: string) => {
     switch (status) { case "WON": return "bg-green-500/10 text-green-600 border-green-200"; case "LOST": return "bg-red-500/10 text-red-600 border-red-200"; default: return "bg-yellow-500/10 text-yellow-600 border-yellow-200" }
   }
@@ -261,37 +261,37 @@ export function BidHistory() {
       
       {/* DIÁLOGOS */}
       <Dialog open={!!viewingBid} onOpenChange={(open) => !open && setViewingBid(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col"><DialogHeader><DialogTitle className="flex items-center gap-2"><FileText className="size-5 text-primary"/> Propuesta: {viewingBid?.project_name}</DialogTitle><DialogDescription>Texto guardado.</DialogDescription></DialogHeader><div className="flex-1 overflow-y-auto border rounded-md bg-muted/30 p-4 mt-2">{viewingBid?.content_text ? (<div className="whitespace-pre-wrap font-mono text-sm text-foreground/80 leading-relaxed">{viewingBid.content_text}</div>) : (<div className="flex flex-col items-center justify-center h-40 text-muted-foreground"><AlertTriangle className="size-8 mb-2 opacity-50"/><p>Sin contenido.</p></div>)}</div><DialogFooter className="mt-2"><Button variant="outline" onClick={() => setViewingBid(null)}>Cerrar</Button>{viewingBid?.content_text && <Button onClick={handleCopyContent}>{copied ? <Check className="mr-2 size-4"/> : <Copy className="mr-2 size-4"/>} {copied ? "Copiado" : "Copiar"}</Button>}</DialogFooter></DialogContent>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col"><DialogHeader><DialogTitle className="flex items-center gap-2"><FileText className="size-5 text-primary"/> Proposal: {viewingBid?.project_name}</DialogTitle><DialogDescription>Saved text.</DialogDescription></DialogHeader><div className="flex-1 overflow-y-auto border rounded-md bg-muted/30 p-4 mt-2">{viewingBid?.content_text ? (<div className="whitespace-pre-wrap font-mono text-sm text-foreground/80 leading-relaxed">{viewingBid.content_text}</div>) : (<div className="flex flex-col items-center justify-center h-40 text-muted-foreground"><AlertTriangle className="size-8 mb-2 opacity-50"/><p>No content.</p></div>)}</div><DialogFooter className="mt-2"><Button variant="outline" onClick={() => setViewingBid(null)}>Close</Button>{viewingBid?.content_text && <Button onClick={handleCopyContent}>{copied ? <Check className="mr-2 size-4"/> : <Copy className="mr-2 size-4"/>} {copied ? "Copied" : "Copy"}</Button>}</DialogFooter></DialogContent>
       </Dialog>
       
       <Dialog open={!!editingBid} onOpenChange={(open) => !open && setEditingBid(null)}>
         <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Editar Licitación</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Edit Bid</DialogTitle></DialogHeader>
             {editingBid && (
                 <div className="grid gap-4 py-4">
-                    <div className="grid gap-2"><Label>Nombre</Label><Input value={editingBid.project_name} onChange={(e) => setEditingBid({...editingBid, project_name: e.target.value})} /></div>
+                    <div className="grid gap-2"><Label>Name</Label><Input value={editingBid.project_name} onChange={(e) => setEditingBid({...editingBid, project_name: e.target.value})} /></div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2"><Label>Industria</Label><Input value={editingBid.industry} onChange={(e) => setEditingBid({...editingBid, industry: e.target.value})} /></div>
+                        <div className="grid gap-2"><Label>Industry</Label><Input value={editingBid.industry} onChange={(e) => setEditingBid({...editingBid, industry: e.target.value})} /></div>
                         <div className="grid gap-2">
-                            <Label>Presupuesto</Label>
+                            <Label>Budget</Label>
                             <Input type="number" value={editingBid.budget === 0 ? "" : editingBid.budget} onChange={(e) => { const val = e.target.value; setEditingBid({...editingBid, budget: val === "" ? 0 : parseFloat(val)}) }} />
                         </div>
                     </div>
                 </div>
             )}
-            <DialogFooter><Button variant="outline" onClick={() => setEditingBid(null)}>Cancelar</Button><Button onClick={handleSaveEdit} disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin size-4 mr-2"/> : <Save className="size-4 mr-2"/>} Guardar</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setEditingBid(null)}>Cancel</Button><Button onClick={handleSaveEdit} disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin size-4 mr-2"/> : <Save className="size-4 mr-2"/>} Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="text-destructive flex items-center gap-2"><AlertTriangle className="size-5"/> {idsToDelete.length > 1 ? `¿Borrar ${idsToDelete.length} registros?` : "¿Borrar esta licitación?"}</AlertDialogTitle><AlertDialogDescription>Se eliminarán del historial y la IA olvidará estos resultados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={executeDelete} className="bg-destructive hover:bg-destructive/90">{idsToDelete.length > 1 ? "Sí, Eliminar Selección" : "Sí, Eliminar"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="text-destructive flex items-center gap-2"><AlertTriangle className="size-5"/> {idsToDelete.length > 1 ? `Delete ${idsToDelete.length} records?` : "Delete this bid?"}</AlertDialogTitle><AlertDialogDescription>They will be removed from history and the AI will forget these results.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={executeDelete} className="bg-destructive hover:bg-destructive/90">{idsToDelete.length > 1 ? "Yes, Delete Selection" : "Yes, Delete"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       {/* HEADER RESPONSIVE MODIFICADO CON BOTÓN DE RE-ENTRENAR E INFO */}
       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Historial</h1>
-          <p className="text-muted-foreground">Gestiona tus propuestas y entrena a la IA.</p>
+          <h1 className="text-2xl md:text-3xl font-bold">History</h1>
+          <p className="text-muted-foreground">Manage your proposals and train the AI.</p>
         </div>
         
         {/* Acciones en bloque responsive */}
@@ -305,11 +305,11 @@ export function BidHistory() {
                 ) : hasPendingChanges ? (
                     <>
                         <Button variant="ghost" onClick={handleCancelChanges} className="flex-1 md:flex-none text-muted-foreground hover:text-foreground">
-                            <X className="mr-2 size-4" /> Cancelar
+                            <X className="mr-2 size-4" /> Cancel
                         </Button>
                         <Button onClick={handleSaveAllChanges} disabled={isSavingBulk} className="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white shadow-lg">
                             {isSavingBulk ? <Loader2 className="animate-spin mr-2 size-4"/> : <Save className="mr-2 size-4" />}
-                            GUARDAR CAMBIOS
+                            SAVE CHANGES
                         </Button>
                     </>
                 ) : (
@@ -322,11 +322,11 @@ export function BidHistory() {
                             className="w-full md:w-auto border-primary/20 hover:bg-primary/5"
                         >
                             <RefreshCw className={`mr-2 size-4 ${isRetraining ? "animate-spin" : ""}`} />
-                            {isRetraining ? "Entrenando..." : "Re-entrenar IA"}
+                            {isRetraining ? "Training..." : "Retrain AI"}
                         </Button>
 
                         <Button onClick={() => setShowUploadDialog(true)} className="w-full md:w-auto bg-primary text-primary-foreground">
-                            <Plus className="mr-2 size-4"/> Subir Licitación Pasada
+                            <Plus className="mr-2 size-4"/> Upload Past Bid
                         </Button>
                     </>
                 )}
@@ -336,7 +336,7 @@ export function BidHistory() {
             {!selectedIds.length && !hasPendingChanges && (
                 <div className="flex items-center text-[10px] md:text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded border border-border self-start md:self-end">
                     <Info className="size-3 mr-1.5 text-blue-500" />
-                    <span>Nota: El modelo se auto-actualiza cada 5 cambios.</span>
+                    <span>Note: The model auto-updates every 5 changes.</span>
                 </div>
             )}
         </div>
@@ -351,16 +351,16 @@ export function BidHistory() {
             <TableHeader>
               <TableRow className="hover:bg-transparent bg-muted/50">
                 <TableHead className="w-[50px]"><Checkbox checked={bids.length > 0 && selectedIds.length === bids.length} onCheckedChange={(c) => handleSelectAll(c as boolean)} /></TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Proyecto</TableHead>
-                <TableHead>Industria</TableHead>
-                <TableHead>Presupuesto</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-center">Acciones</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Project</TableHead>
+                <TableHead>Industry</TableHead>
+                <TableHead>Budget</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bids.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Sin historial.</TableCell></TableRow> : (
+              {bids.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">No history.</TableCell></TableRow> : (
                 bids.map((bid) => {
                     const isNew = bid.id === activeHighlight
                     const isSelected = selectedIds.includes(bid.id)
@@ -378,15 +378,15 @@ export function BidHistory() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="PENDING">⏳ Pendiente</SelectItem>
-                                        <SelectItem value="WON">🏆 Ganada</SelectItem>
-                                        <SelectItem value="LOST">❌ Perdida</SelectItem>
+                                        <SelectItem value="PENDING">⏳ Pending</SelectItem>
+                                        <SelectItem value="WON">🏆 Won</SelectItem>
+                                        <SelectItem value="LOST">❌ Lost</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </TableCell>
                             <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={() => setViewingBid(bid)} title="Ver"><FileText className="size-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={() => setViewingBid(bid)} title="View"><FileText className="size-4" /></Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setEditingBid(bid)}><Pencil className="size-4" /></Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => confirmDelete([bid.id])}><Trash2 className="size-4" /></Button>
                                 </div>
@@ -403,7 +403,7 @@ export function BidHistory() {
       {/* --- VISTA MÓVIL: TARJETAS --- */}
       <div className="md:hidden space-y-4">
         {bids.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">Sin historial.</div>
+            <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">No history.</div>
         ) : (
             bids.map((bid) => {
                 const isSelected = selectedIds.includes(bid.id)
@@ -430,11 +430,11 @@ export function BidHistory() {
                             {/* Info Grid */}
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div className="bg-muted/50 p-2 rounded flex flex-col">
-                                    <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Briefcase className="size-3"/> Industria</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><Briefcase className="size-3"/> Industry</span>
                                     <span className="font-medium truncate">{bid.industry || "N/A"}</span>
                                 </div>
                                 <div className="bg-muted/50 p-2 rounded flex flex-col">
-                                    <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><DollarSign className="size-3"/> Presupuesto</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1"><DollarSign className="size-3"/> Budget</span>
                                     <span className="font-mono font-medium">{bid.budget > 0 ? `$${bid.budget.toLocaleString()}` : "-"}</span>
                                 </div>
                             </div>
@@ -446,9 +446,9 @@ export function BidHistory() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="PENDING">⏳ Pendiente</SelectItem>
-                                        <SelectItem value="WON">🏆 Ganada</SelectItem>
-                                        <SelectItem value="LOST">❌ Perdida</SelectItem>
+                                        <SelectItem value="PENDING">⏳ Pending</SelectItem>
+                                        <SelectItem value="WON">🏆 Won</SelectItem>
+                                        <SelectItem value="LOST">❌ Lost</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

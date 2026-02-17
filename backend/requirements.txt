@@ -13,9 +13,6 @@ langchain-core>=0.2.0
 langchain-google-genai>=1.0.3
 langchain-pinecone>=0.1.1
 pinecone-client>=3.2.2
-# --- CAMBIO AQUÍ: Sacamos OpenAI, ponemos la Hub de HF ---
-huggingface_hub>=0.20.0
-# ---------------------------------------------------------
 scikit-learn==1.4.0
 pandas==2.2.0
 shap==0.44.1

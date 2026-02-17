@@ -28,12 +28,6 @@ _llm = None
 index_name = "autobid-index"
 
 class GoogleRawRESTEmbeddings(Embeddings):
-    """
-    Google Gemini Embeddings REST
-    Modelo: models/gemini-embedding-001
-    Dimensiones: 3072
-    API: v1beta
-    """
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -65,12 +59,9 @@ class GoogleRawRESTEmbeddings(Embeddings):
                 )
 
                 if response.status_code != 200:
-                    print(f"⚠️ Google Error {response.status_code}: {response.text}")
-
                     if response.status_code == 429:
                         time.sleep(2)
                         continue
-
                     raise RuntimeError(response.text)
 
                 data = response.json()
@@ -81,6 +72,14 @@ class GoogleRawRESTEmbeddings(Embeddings):
                 time.sleep(1)
 
         raise RuntimeError("Fallo total gemini-embedding-001.")
+
+    # 👇 ESTO FALTABA
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        print(f"⚡ Procesando {len(texts)} textos...")
+        return [self._embed_single(t) for t in texts]
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed_single(text)
 # --- CARGADORES ---
 
 def get_embeddings():

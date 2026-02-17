@@ -30,24 +30,23 @@ index_name = "autobid-index"
 class GoogleRawRESTEmbeddings(Embeddings):
     """
     Google Gemini Embeddings REST
-    Modelo actual: models/embedding-001
-    Dimensiones: 768
-    API: v1 (NO v1beta)
+    Modelo: models/gemini-embedding-001
+    Dimensiones: 3072
+    API: v1beta
     """
 
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.model_name = "models/embedding-001"
+        self.model_name = "models/gemini-embedding-001"
         self.api_url = (
-            f"https://generativelanguage.googleapis.com/v1/"
-            f"{self.model_name}:embedContent?key={self.api_key}"
+            f"https://generativelanguage.googleapis.com/v1beta/"
+            f"{self.model_name}:embedContent"
         )
 
     def _embed_single(self, text: str) -> List[float]:
         clean_text = text.replace("\n", " ").strip()
 
         payload = {
-            "model": self.model_name,
             "content": {
                 "parts": [{"text": clean_text}]
             }
@@ -57,9 +56,12 @@ class GoogleRawRESTEmbeddings(Embeddings):
             try:
                 response = requests.post(
                     self.api_url,
-                    headers={"Content-Type": "application/json"},
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": self.api_key,
+                    },
                     json=payload,
-                    timeout=15,
+                    timeout=20,
                 )
 
                 if response.status_code != 200:
@@ -72,21 +74,13 @@ class GoogleRawRESTEmbeddings(Embeddings):
                     raise RuntimeError(response.text)
 
                 data = response.json()
-
                 return data["embedding"]["values"]
 
             except Exception as e:
                 print(f"⚠️ Retry {attempt+1}: {e}")
                 time.sleep(1)
 
-        raise RuntimeError("Fallo total embedding-001.")
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        print(f"⚡ Procesando {len(texts)} textos con embedding-001...")
-        return [self._embed_single(t) for t in texts]
-
-    def embed_query(self, text: str) -> List[float]:
-        return self._embed_single(text)
+        raise RuntimeError("Fallo total gemini-embedding-001.")
 # --- CARGADORES ---
 
 def get_embeddings():
